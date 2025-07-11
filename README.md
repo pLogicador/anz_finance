@@ -1,4 +1,4 @@
-# A.N.Z Finance
+# ANZ Finance
 
 Projeto para analisar extratos bancários no formato OFX, classificar automaticamente as transações financeiras usando modelos LLM (Groq AI) e apresentar um dashboard interativo com filtros para visualização dos dados.
 
