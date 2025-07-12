@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "anz-finance"
+version = "0.1.0"
+description = ""
+authors = ["pLogicador <pedroemanuelsm0@gmail.com>"]
+readme = "README.md"
+packages = [{ include = "modules" }]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = ">=3.12,<4.0"
+pandas = "^2.3.1"
+streamlit = "^1.46.1"
+plotly = "^6.2.0"
+tqdm = "^4.67.1"
+ofxparse = "^0.21"
+python-dotenv = "^1.1.1"
+langchain = "^0.3.26"
+langchain-groq = "^0.3.6"
+langchain-openai = "^0.3.27"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
