@@ -1,6 +1,7 @@
 import streamlit as st
 import plotly.express as px
 from io import BytesIO
+import base64
 
 from modules.parsers.ofx_parser import parse_ofx_files_from_upload
 from modules.data.finance_data import preprocess_df, filter_transactions
@@ -10,10 +11,17 @@ from modules.llm.categorizer import Categorizer
 def run_finance_dashboard():
     #st.set_page_config(page_title="Finance Dashboard", layout="wide")
     #st.title("💰 Personal Finance Dashboard")
-    #st.title("💰 Finlytics - Painel de Controle Financeiro")
-    st.markdown("""
-    <h1>💰 Finlytics</h1>
-    <h4 style="color: #9CA3AF;">Painel de Controle Financeiro</h4>
+    
+    with open("assets/images/logo.png", "rb") as f:
+        data = f.read()
+    encoded = base64.b64encode(data).decode()
+
+    st.markdown(f"""
+    <div style="text-align: center;">
+        <img src="data:image/png;base64,{encoded}" width="200">
+        <!-- <h1>💰 ANZ Finance</h1> -->
+        <h4 style="color: #9CA3AF;">Seu Painel de Controle Financeiro</h4>
+    </div>
     """, unsafe_allow_html=True)
 
 

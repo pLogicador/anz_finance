@@ -48,7 +48,7 @@ def get_token_from_query():
     return token_val
 
 def run_dashboard():
-    st.set_page_config(page_title="Finance Dashboard", layout="wide")
+    st.set_page_config(page_title="ANZ Finance", layout="wide")
 
     token = get_token_from_query()
     logger.info("Token recebido (raw): %s", token)
