@@ -1,12 +1,14 @@
+import os
 import pandas as pd
 import ofxparse
-from io import BytesIO
 
-def parse_ofx_files_from_upload(files) -> pd.DataFrame:
+def parse_ofx_files(folder_path: str) -> pd.DataFrame:
     df = pd.DataFrame()
-    for uploaded_file in files:
+    for extrato in os.listdir(folder_path):
         try:
-            ofx = ofxparse.OfxParser.parse(BytesIO(uploaded_file.getvalue()))
+            with open(os.path.join(folder_path, extrato), "rb") as ofx_file:
+                ofx = ofxparse.OfxParser.parse(ofx_file)
+
             transactions_data = []
             for account in ofx.accounts:
                 for transaction in account.statement.transactions:
@@ -16,10 +18,13 @@ def parse_ofx_files_from_upload(files) -> pd.DataFrame:
                         "Descrição": transaction.memo,
                         "ID": transaction.id,
                     })
+
             df_temp = pd.DataFrame(transactions_data)
             if not df_temp.empty:
                 df_temp["Data"] = df_temp["Data"].apply(lambda x: x.date())
                 df = pd.concat([df, df_temp], ignore_index=True)
+            else:
+                print(f"[DEBUG] No transactions in: {extrato}")
         except Exception as e:
-            print(f"[ERROR] Failed to process {uploaded_file.name}: {e}")
+            print(f"[ERROR] Failed to process {extrato}: {e}")
     return df

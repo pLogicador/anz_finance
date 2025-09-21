@@ -1,4 +1,3 @@
-import time
 from langchain_core.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from config import GROQ_API_KEY
@@ -35,32 +34,17 @@ Agora, classifique a seguinte transação:
 prompt = PromptTemplate.from_template(template=prompt_template)
 
 class Categorizer:
-    DEFAULT_MODELS = ["llama-3.1-8b-instant", "llama-3.1-70b-versatile"]
-
-    def __init__(self, model_name=None, api_key=GROQ_API_KEY):
-        self.model_name = model_name or self.DEFAULT_MODELS[0]
-        self.api_key = api_key
-        self._init_chat(self.model_name)
-
-    def _init_chat(self, model_name):
-        try:
-            self.chat = ChatGroq(model=model_name, api_key=self.api_key)
-        except Exception as e:
-            print(f"[WARN] Failed to initialize model {model_name}: {e}")
-            fallback = self.DEFAULT_MODELS[1]
-            print(f"[INFO] Trying fallback model {fallback}...")
-            self.chat = ChatGroq(model=fallback, api_key=self.api_key)
+    def __init__(self, model_name="llama3-8b-8192", api_key=GROQ_API_KEY):
+        self.chat = ChatGroq(model=model_name, api_key=api_key)
 
     def classify(self, descriptions):
+        chain = prompt | self.chat
         categories = []
         for desc in descriptions:
             try:
-                chain = prompt | self.chat
                 res = chain.invoke(desc).content
-                categories.append(res.strip())
             except Exception as e:
-                print(f"[ERROR] {e}")
-                categories.append("Error")
+                print(f"[ERROR] when classifying '{desc}': {e}")
+                res = "Error"
+            categories.append(res)
         return categories
-
-

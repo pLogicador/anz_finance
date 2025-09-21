@@ -81,7 +81,6 @@ narwhals==1.43.0
 nest-asyncio==1.6.0
 numpy==2.2.5
 oauthlib==3.3.1
-obsws-python==1.7.2
 ofxparse==0.21
 openai==1.93.3
 openpyxl==3.1.5
@@ -108,8 +107,6 @@ pydantic==2.11.5
 pydantic-settings==2.10.1
 pydantic_core==2.33.2
 pydeck==0.9.1
-pydub==0.25.1
-pygame==2.6.1
 Pygments==2.19.1
 pymongo==4.13.2
 pyparsing==3.2.3
