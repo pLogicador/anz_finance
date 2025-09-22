@@ -60,6 +60,7 @@ def run_finance_dashboard():
     else:
         st.info("⬆️ Envie um ou mais arquivos OFX para começar.")
 
+
 def show_dashboard(df):
     """Renderiza a interface de dashboard (filtros, tabela e gráficos)."""
 
@@ -75,12 +76,15 @@ def show_dashboard(df):
 
     filtered_df = filter_transactions(df, selected_month, selected_categories)
 
-    # ===== Tabela de Transações =====
-    st.subheader("📋 Tabela de Transações Filtradas")
-    st.dataframe(filtered_df, use_container_width=True)
+    col1, col2 = st.columns([0.6, 0.4])
 
-    # ===== Gráfico de pizza por categoria =====
-    st.subheader("📊 Distribuição por Categoria")
+    # Tabela de transações
+    col1.subheader("📋 Tabela de Transações Filtradas")
+    col1.dataframe(filtered_df, use_container_width=True)
+
+    # Gráfico de pizza por categoria
+    col2.subheader("📊 Distribuição por Categoria")
+
     if not filtered_df.empty:
         summary = (
             filtered_df
@@ -99,8 +103,8 @@ def show_dashboard(df):
                 title="Distribuição de Gastos por Categoria",
                 hole=0.3
             )
-            st.plotly_chart(fig, use_container_width=True)
+            col2.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("🔍 É necessário mais de uma categoria com valores positivos para gerar o gráfico.")
+            col2.info("🔍 É necessário mais de uma categoria com valores positivos para gerar o gráfico.")
     else:
-        st.warning("⚠️ Nenhuma transação encontrada com os filtros aplicados.")
+        col2.warning("⚠️ Nenhuma transação encontrada com os filtros aplicados.")
