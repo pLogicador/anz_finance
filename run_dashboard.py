@@ -3,6 +3,8 @@ import logging
 import requests
 import streamlit as st
 from modules.dashboard.streamlit_app import run_finance_dashboard
+from modules.ui import theme
+from modules.ui.components import empty_state
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dashboard")
@@ -47,27 +49,41 @@ def get_token_from_query():
             token_val = token_val.split(" ", 1)[1]
     return token_val
 
+def _render_login_wall(icon: str, title: str, subtitle: str) -> None:
+    theme.apply("dark")
+    _, center, _ = st.columns([1, 1.4, 1])
+    with center:
+        st.markdown("<div style='height: 12vh;'></div>", unsafe_allow_html=True)
+        empty_state(icon, title, subtitle)
+        st.link_button("Ir para login →", f"{API_HUB}/login.html", use_container_width=True)
+
+
 def run_dashboard():
-    st.set_page_config(page_title="ANZ Finance", layout="wide")
+    st.set_page_config(page_title="ANZ Finance", layout="wide", page_icon="assets/images/logo.png")
 
     token = get_token_from_query()
     logger.info("Token recebido (raw): %s", token)
 
     if not token:
-        st.warning("Você precisa fazer login antes de acessar o dashboard.")
-        st.markdown(f"[Ir para login]({API_HUB}/login.html)")
+        _render_login_wall(
+            "🔒",
+            "Login necessário",
+            "Você precisa fazer login antes de acessar o dashboard.",
+        )
         st.stop()
 
     user_info = validate_token_with_api(token)
     if not user_info:
-        st.error("⚠️ Token inválido ou expirado. Faça login novamente.")
-        st.markdown(f"[Ir para login]({API_HUB}/login.html)")
+        _render_login_wall(
+            "⚠️",
+            "Sessão expirada",
+            "Token inválido ou expirado. Faça login novamente.",
+        )
         st.stop()
 
     user_email = user_info.get("user", {}).get("email", "Usuário")
-    st.sidebar.success(f"Usuário: {user_email}")
 
-    run_finance_dashboard()
+    run_finance_dashboard(user_email)
 
 if __name__ == "__main__":
     run_dashboard()
