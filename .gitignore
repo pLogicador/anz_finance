@@ -1,8 +1,6 @@
-# Ignore OFX extract folder
+# Ignore OFX extract folder (real bank data, never committed)
 extratos/
 *.csv
-
-CLAUDE.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

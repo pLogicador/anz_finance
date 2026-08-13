@@ -1,0 +1,2 @@
+This is not a real OFX file. Just some garbage text used to prove one bad
+upload doesn't abort parsing the rest of the batch.

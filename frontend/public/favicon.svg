@@ -1,0 +1,27 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ANZ Finance">
+  <!--
+    ANZ Finance's own mark -- not a copy of any sibling Syncron product's
+    icon, but built in the same visual language confirmed across the
+    ecosystem (AgenteOS, Live Scheduler, Docksmith): a rounded-square
+    badge, a single accent color, one simple stroke-based glyph tied
+    directly to what the product does. Here: an ascending trend line
+    (a real "chart going up and to the right" reading a statement's data
+    over time, dipping once before recovering -- not a flat/generic
+    up-arrow) ending in a filled point, the same "line resolving into a
+    dot" grammar AgenteOS/Live Scheduler both use, but shaped as a real
+    financial trend rather than a clock/agent motif. Badge color is ANZ's
+    own --color-surface-0 design token (near-black), so the favicon reads
+    as literally the same surface as the product's own UI, not an
+    arbitrary brand color picked in isolation.
+  -->
+  <rect width="32" height="32" rx="8" fill="#0a0d0c"/>
+  <path
+    d="M7 23 L13 17.5 L17 20 L22 12.5 L25 9"
+    stroke="#34d399"
+    stroke-width="2.4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+  <circle cx="25" cy="9" r="2.4" fill="#34d399"/>
+</svg>
