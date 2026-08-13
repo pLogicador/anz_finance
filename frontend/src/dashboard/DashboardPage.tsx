@@ -13,6 +13,7 @@ import { CumulativeBalanceChart } from './charts/CumulativeBalanceChart'
 import { MonthlyIncomeExpenseChart } from './charts/MonthlyIncomeExpenseChart'
 import { TopCategoriesBarChart } from './charts/TopCategoriesBarChart'
 import { type Command, CommandPalette } from './command-palette/CommandPalette'
+import { DashboardSkeleton } from './DashboardSkeleton'
 import { EmptyState } from './EmptyState'
 import { downloadCsv, downloadPdf } from './export/api'
 import { ExportButtons } from './export/ExportButtons'
@@ -38,7 +39,7 @@ const ComparePanel = lazy(() => import('./analysis/ComparePanel').then((m) => ({
 const AiAssistantPanel = lazy(() => import('./ai/AiAssistantPanel').then((m) => ({ default: m.AiAssistantPanel })))
 
 function TabLoadingFallback() {
-  return <div className="p-8 text-sm text-neutral-500">Carregando...</div>
+  return <div className="h-64 animate-pulse rounded-2xl bg-surface-1 motion-reduce:animate-none" aria-busy="true" aria-label="Carregando" />
 }
 
 const TABS = ['Visão Geral', 'Tendências', 'Mapa de Gastos', 'Transações', 'Análise', 'Assistente IA'] as const
@@ -96,7 +97,7 @@ export default function DashboardPage() {
   }, [hasData, onboardingSeen])
 
   if (monthsQuery.isLoading) {
-    return <div className="p-8 text-sm text-neutral-500">Carregando...</div>
+    return <DashboardSkeleton />
   }
 
   if (!hasData) {
@@ -172,15 +173,30 @@ export default function DashboardPage() {
 
       {!presentationMode ? (
         <>
-          <header className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-            <div className="flex items-center gap-3">
-              <LogoMark size={32} />
-              <div>
-                <p className="text-xs text-neutral-500">ANZ Finance</p>
-                <h1 className="text-xl font-semibold text-neutral-50">Painel financeiro</h1>
+          {/* Two rows on purpose, not one unwrapping row: the primary
+              identity+action pair (logo/title, "Novo envio") never
+              competes for space with the secondary utilities (search,
+              help, presentation mode) below it -- confirmed by hand that a
+              single flex row here overflowed at 375px (search box alone
+              was ~85% of the viewport width). */}
+          <header className="space-y-3 print:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <LogoMark size={32} />
+                <div>
+                  <p className="text-xs text-neutral-500">ANZ Finance</p>
+                  <h1 className="text-xl font-semibold text-neutral-50">Painel financeiro</h1>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowUpload(true)}
+                className="rounded-lg bg-accent-strong px-3.5 py-2 text-xs font-semibold text-neutral-950 transition hover:brightness-110"
+              >
+                Novo envio
+              </button>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <GlobalSearch categories={selectedCategories} type={selectedType} onJumpToMonth={setSelectedMonth} />
               {email ? <span className="hidden text-sm text-neutral-500 sm:inline">{email}</span> : null}
               <button
@@ -198,13 +214,6 @@ export default function DashboardPage() {
                 className="rounded-lg border border-surface-border px-3 py-1.5 text-xs text-neutral-300 hover:border-accent/50"
               >
                 Modo apresentação
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowUpload(true)}
-                className="rounded-lg border border-surface-border px-3 py-1.5 text-xs text-neutral-300 hover:border-accent/50"
-              >
-                Novo envio
               </button>
             </div>
           </header>
@@ -226,6 +235,7 @@ export default function DashboardPage() {
               selectedType={selectedType}
               onTypeChange={setSelectedType}
               categoryCounts={categoryCountsQuery.data?.counts}
+              resultCount={tab === 'Transações' ? transactionsQuery.data?.count : undefined}
             />
             <ExportButtons month={selectedMonth} categories={selectedCategories} type={selectedType} />
           </div>

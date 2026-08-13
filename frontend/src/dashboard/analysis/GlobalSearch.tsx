@@ -42,7 +42,7 @@ export function GlobalSearch({
   const results = search.data?.transactions.slice(0, 8) ?? []
 
   return (
-    <div className="relative w-full max-w-xs">
+    <div className="relative w-full max-w-[180px] sm:max-w-xs">
       <input
         value={query}
         onChange={(e) => runSearch(e.target.value)}

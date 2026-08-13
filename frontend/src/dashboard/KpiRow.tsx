@@ -1,46 +1,63 @@
+import { InfoTooltip } from '@/design-system/InfoTooltip'
 import { formatCurrency, formatPercent } from '@/design-system/format'
 
 import type { PeriodSummary } from './types'
 
-interface KpiCardProps {
-  label: string
-  value: string
+interface DeltaProps {
   delta?: number | null
   /** "more is bad" metrics (expenses): a positive delta should read as unfavorable. */
   invert?: boolean
-  footnote?: string
 }
 
-function KpiCard({ label, value, delta, invert, footnote }: KpiCardProps) {
-  const hasDelta = delta !== undefined && delta !== null
-  const favorable = hasDelta ? (invert ? delta < 0 : delta > 0) : null
-
-  return (
-    <div className="rounded-2xl border border-surface-border bg-surface-1 p-5">
-      <p className="text-xs font-medium tracking-wide text-neutral-500 uppercase">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-neutral-50">{value}</p>
-      {hasDelta ? (
-        <p className={`mt-1 text-xs font-medium ${favorable ? 'text-accent' : 'text-red-400'}`}>
-          {formatPercent(delta)} vs. mês anterior
-        </p>
-      ) : footnote ? (
-        <p className="mt-1 text-xs text-neutral-500">{footnote}</p>
-      ) : null}
-    </div>
-  )
+function Delta({ delta, invert }: DeltaProps) {
+  if (delta === undefined || delta === null) return null
+  const favorable = invert ? delta < 0 : delta > 0
+  return <span className={`text-xs font-medium ${favorable ? 'text-accent' : 'text-red-400'}`}>{formatPercent(delta)} vs. mês anterior</span>
 }
 
+/**
+ * Hierarchy redesign (was: 4 identical cards -- "parede de cards", no
+ * signal of which number matters most). Saldo (net) is the one number
+ * that answers "how am I actually doing this period" -- it's now the
+ * visually dominant hero card, with Receitas/Despesas as smaller
+ * secondary stats beside it, and "maior categoria" folded into the hero
+ * card as a footnote instead of competing for its own full card.
+ */
 export function KpiRow({ summary, deltas, month }: { summary: PeriodSummary; deltas: { income: number | null; expense: number | null; net: number | null }; month: string }) {
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <KpiCard label="Receitas do período" value={formatCurrency(summary.income)} delta={deltas.income} />
-      <KpiCard label="Despesas do período" value={formatCurrency(Math.abs(summary.expense))} delta={deltas.expense} invert />
-      <KpiCard label="Saldo do período" value={formatCurrency(summary.net)} delta={deltas.net} />
-      <KpiCard
-        label="Maior categoria"
-        value={summary.top_category ?? '—'}
-        footnote={summary.top_category ? `${formatCurrency(summary.top_category_amount)} em ${month}` : 'Sem gastos no período'}
-      />
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
+      <div className="col-span-2 rounded-2xl border border-accent/25 bg-accent-soft p-5 lg:col-span-1">
+        <div className="flex items-center gap-1.5">
+          <p className="text-xs font-medium tracking-wide text-neutral-400 uppercase">Saldo do período</p>
+          <InfoTooltip>
+            Receitas menos despesas em {month}, considerando apenas as categorias e o tipo de transação que você tem
+            selecionados nos filtros.
+          </InfoTooltip>
+        </div>
+        <p className="mt-2 text-3xl font-semibold text-neutral-50 sm:text-4xl">{formatCurrency(summary.net)}</p>
+        <Delta delta={deltas.net} />
+        <div className="mt-4 border-t border-accent/20 pt-3 text-xs text-neutral-400">
+          {summary.top_category ? (
+            <>
+              Maior categoria: <span className="font-medium text-neutral-200">{summary.top_category}</span> ({formatCurrency(summary.top_category_amount)})
+            </>
+          ) : (
+            'Sem gastos categorizados no período.'
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-surface-border bg-surface-1 p-4">
+        <p className="text-xs font-medium tracking-wide text-neutral-500 uppercase">Receitas</p>
+        <p className="mt-1.5 text-xl font-semibold text-neutral-50">{formatCurrency(summary.income)}</p>
+        <Delta delta={deltas.income} />
+      </div>
+
+      <div className="rounded-2xl border border-surface-border bg-surface-1 p-4">
+        <p className="text-xs font-medium tracking-wide text-neutral-500 uppercase">Despesas</p>
+        <p className="mt-1.5 text-xl font-semibold text-neutral-50">{formatCurrency(Math.abs(summary.expense))}</p>
+        <Delta delta={deltas.expense} invert />
+      </div>
     </div>
   )
 }

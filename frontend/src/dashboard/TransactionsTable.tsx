@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 
+import { categoryColor } from '@/design-system/category-colors'
 import { formatCurrency, formatDateBr } from '@/design-system/format'
 
 import { EmptyState } from './EmptyState'
@@ -46,7 +47,8 @@ export function TransactionsTable({ transactions }: { transactions: Transaction[
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto">
+          {/* Desktop/tablet: a real table, built for scanning/sorting-by-eye. */}
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="text-xs tracking-wide text-neutral-500 uppercase">
@@ -72,6 +74,28 @@ export function TransactionsTable({ transactions }: { transactions: Transaction[
               </tbody>
             </table>
           </div>
+
+          {/* Mobile: NOT the same table shrunk/scrolled sideways -- each
+              transaction becomes its own card, description/value as the
+              two things worth a glance, category/date as secondary line. */}
+          <ul className="divide-y divide-surface-border/60 sm:hidden">
+            {pageItems.map((t, i) => (
+              <li key={`${t.Data}-${i}`} className="flex items-center justify-between gap-3 p-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-neutral-200">{t.Descrição}</p>
+                  <div className="mt-1 flex items-center gap-1.5 text-xs text-neutral-500">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: categoryColor(t.Categorias) }} aria-hidden />
+                    <span className="truncate">{t.Categorias}</span>
+                    <span aria-hidden>·</span>
+                    <span className="shrink-0">{formatDateBr(t.Data)}</span>
+                  </div>
+                </div>
+                <span className={`shrink-0 text-right text-sm font-semibold whitespace-nowrap ${t.Valor >= 0 ? 'text-accent' : 'text-red-400'}`}>
+                  {formatCurrency(t.Valor)}
+                </span>
+              </li>
+            ))}
+          </ul>
 
           <div className="flex items-center justify-between border-t border-surface-border p-3 text-xs text-neutral-500">
             <button type="button" disabled={currentPage === 0} onClick={() => setPage((p) => p - 1)} className="disabled:opacity-30">
