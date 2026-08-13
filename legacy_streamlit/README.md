@@ -1,4 +1,8 @@
-# ANZ Finance
+# ANZ Finance (versão legada — Streamlit)
+
+> **Arquivado.** Esta é a implementação original em Streamlit, movida para `legacy_streamlit/` no início da reconstrução "ANZ Finance 2.0" (backend FastAPI + frontend React/Vite, ver `../CLAUDE.md` e `C:\Users\pedro\.claude\plans\keen-percolating-valley.md`). Mantida funcional aqui só como referência de comportamento durante a portabilidade da lógica de negócio — não é mais o app ativo. Para rodar: `poetry install` (ou `pip install -r requirements.txt`) dentro desta pasta, depois `streamlit run run_dashboard.py`. Será removida ao final da Fase 10 da reconstrução, após o corte para produção estar confirmado.
+
+---
 
 Projeto para analisar extratos bancários no formato OFX, classificar automaticamente as transações financeiras usando modelos LLM (Groq AI) e apresentar um dashboard interativo com filtros para visualização dos dados.
 

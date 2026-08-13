@@ -11,15 +11,24 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+# NOTE: `build/`/`lib/`/`lib64/` deliberately removed from this list --
+# this repo has no Python packaging/build step (the FastAPI backend just
+# runs via uvicorn, nothing does `python -m build`) that would ever
+# produce these as real artifacts, but as generic bare directory names
+# they DID silently swallow real frontend source (`frontend/src/lib/`,
+# containing api-client.ts/env.ts -- confirmed the cause of a real Vercel
+# build failure, "Cannot find module '@/lib/api-client'"). A bare pattern
+# with no leading slash matches at any depth, so a Python-boilerplate rule
+# meant for a project root can reach into an unrelated frontend/ subtree
+# in a monorepo like this one. Same failure mode already found once this
+# session for the equally-bare `*.md` rule -- if a future line here needs
+# a directory name that's also a plausible JS/TS folder name, anchor it
+# to a real path (`backend/build/`) instead of leaving it bare.
 .Python
-build/
-develop-eggs/
 dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
 parts/
 sdist/
 var/
