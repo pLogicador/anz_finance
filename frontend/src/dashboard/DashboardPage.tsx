@@ -14,6 +14,10 @@ import { MonthlyIncomeExpenseChart } from './charts/MonthlyIncomeExpenseChart'
 import { TopCategoriesBarChart } from './charts/TopCategoriesBarChart'
 import { type Command, CommandPalette } from './command-palette/CommandPalette'
 import { DashboardSkeleton } from './DashboardSkeleton'
+import { DemoInsights } from './demo/DemoInsights'
+import { DemoLockedPanel } from './demo/DemoLockedPanel'
+import { DemoModeBanner } from './demo/DemoModeBanner'
+import { demoAllCategories, demoCategoryCounts, demoMonthsResponse, demoSearch, demoSummaryFor, demoTransactionsFor, demoTrendTransactions } from './demo/demo-data'
 import { EmptyState } from './EmptyState'
 import { downloadCsv, downloadPdf } from './export/api'
 import { ExportButtons } from './export/ExportButtons'
@@ -25,7 +29,7 @@ import { OnboardingTour } from './onboarding/OnboardingTour'
 import { useOnboardingStore } from './onboarding/onboarding-store'
 import { TransactionsTable } from './TransactionsTable'
 import type { TypeFilter } from './types'
-import { UploadPanel } from './UploadPanel'
+import { WelcomeHub } from './WelcomeHub'
 import { WorkSessionExpiredNotice } from './WorkSessionExpiredNotice'
 
 // Fase 9 performance pass: these three are the heaviest optional pieces of
@@ -48,9 +52,20 @@ type Tab = (typeof TABS)[number]
 export default function DashboardPage() {
   const email = useSessionStore((s) => s.session?.email)
   const [showUpload, setShowUpload] = useState(false)
+  // Fase 13 -- "explorar sem enviar nada ainda": a fully local, backend-free
+  // preview of the real dashboard UI populated with `demo/demo-data.ts`.
+  // Exiting demo mode always also sets `showUpload`, so "Enviar meus
+  // extratos" from anywhere (header, command palette, the banner itself)
+  // consistently lands on the real upload form, not back on the chooser.
+  const [isDemo, setIsDemo] = useState(false)
+  const goToRealUpload = () => {
+    setIsDemo(false)
+    setShowUpload(true)
+  }
 
   const monthsQuery = useMonths(true)
-  const hasData = monthsQuery.isSuccess && monthsQuery.data.months.length > 0 && !showUpload
+  const hasRealData = monthsQuery.isSuccess && monthsQuery.data.months.length > 0 && !showUpload
+  const hasData = hasRealData || isDemo
 
   const [selectedYear, setSelectedYear] = useState('Todos')
   const [selectedMonth, setSelectedMonth] = useState('')
@@ -64,8 +79,8 @@ export default function DashboardPage() {
   const onboardingSeen = useOnboardingStore((s) => s.seen)
   const markOnboardingSeen = useOnboardingStore((s) => s.markSeen)
 
-  const allMonths = monthsQuery.data?.months ?? []
-  const allYears = monthsQuery.data?.years ?? []
+  const allMonths = isDemo ? demoMonthsResponse().months : (monthsQuery.data?.months ?? [])
+  const allYears = isDemo ? demoMonthsResponse().years : (monthsQuery.data?.years ?? [])
   const monthsForYear = selectedYear === 'Todos' ? allMonths : allMonths.filter((m) => m.startsWith(selectedYear))
   const effectiveMonths = monthsForYear.length > 0 ? monthsForYear : allMonths
 
@@ -76,18 +91,31 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveMonths.join(','), selectedMonth])
 
-  const allCategoriesQuery = useAllCategories(hasData)
+  const allCategoriesQuery = useAllCategories(hasData && !isDemo)
+  const allCategories = isDemo ? demoAllCategories() : allCategoriesQuery.categories
   useEffect(() => {
-    if (!categoriesInitialized && allCategoriesQuery.categories.length > 0) {
-      setSelectedCategories(allCategoriesQuery.categories)
+    if (!categoriesInitialized && allCategories.length > 0) {
+      setSelectedCategories(allCategories)
       setCategoriesInitialized(true)
     }
-  }, [allCategoriesQuery.categories, categoriesInitialized])
+  }, [allCategories, categoriesInitialized])
 
-  const transactionsQuery = useTransactions(selectedMonth, selectedCategories, selectedType, hasData)
-  const summaryQuery = useSummary(selectedMonth, selectedCategories, selectedType, hasData)
-  const trendQuery = useTrend(selectedCategories, selectedType, hasData && tab !== 'Visão Geral')
-  const categoryCountsQuery = useCategoryCounts(selectedMonth, hasData)
+  // Fase 13: each of these four flips to a synchronous local computation
+  // (`demo/demo-data.ts`) when `isDemo` is active -- `enabled: false` keeps
+  // the real react-query hooks from ever calling the backend in that state
+  // (there is no real workspace behind a demo session to query).
+  const transactionsQuery = useTransactions(selectedMonth, selectedCategories, selectedType, hasData && !isDemo)
+  const transactions = isDemo ? demoTransactionsFor(selectedMonth, selectedCategories, selectedType) : (transactionsQuery.data?.transactions ?? [])
+  const transactionsCount = isDemo ? transactions.length : transactionsQuery.data?.count
+
+  const summaryQuery = useSummary(selectedMonth, selectedCategories, selectedType, hasData && !isDemo)
+  const summaryData = isDemo ? demoSummaryFor(selectedMonth, selectedCategories, selectedType) : summaryQuery.data
+
+  const trendQuery = useTrend(selectedCategories, selectedType, hasData && tab !== 'Visão Geral' && !isDemo)
+  const trendTransactions = isDemo ? demoTrendTransactions(selectedCategories, selectedType) : trendQuery.data?.transactions
+
+  const categoryCountsQuery = useCategoryCounts(selectedMonth, hasData && !isDemo)
+  const categoryCounts = isDemo ? demoCategoryCounts(selectedMonth) : categoryCountsQuery.data?.counts
 
   // Auto-show the onboarding tour the first time this browser reaches a
   // real dashboard with data -- never on the upload screen itself (nothing
@@ -115,12 +143,14 @@ export default function DashboardPage() {
     }
     return (
       <div className="p-8">
-        <UploadPanel
+        <WelcomeHub
+          initialPath={showUpload ? 'upload' : 'choose'}
           onUploaded={() => {
             setShowUpload(false)
             setCategoriesInitialized(false)
             monthsQuery.refetch()
           }}
+          onEnterDemo={() => setIsDemo(true)}
         />
       </div>
     )
@@ -130,9 +160,16 @@ export default function DashboardPage() {
     ...TABS.map((t) => ({ id: `tab-${t}`, label: `Ir para "${t}"`, section: 'Navegação', onRun: () => setTab(t) })),
     { id: 'presentation-on', label: 'Ativar modo apresentação', section: 'Visualização', onRun: () => setPresentationMode(true) },
     { id: 'presentation-off', label: 'Sair do modo apresentação', section: 'Visualização', onRun: () => setPresentationMode(false) },
-    { id: 'new-upload', label: 'Enviar novos extratos', section: 'Dados', onRun: () => setShowUpload(true) },
-    { id: 'export-csv', label: 'Baixar CSV do mês selecionado', section: 'Exportar', onRun: () => void downloadCsv(selectedMonth, selectedCategories, selectedType) },
-    { id: 'export-pdf', label: 'Baixar PDF do mês selecionado', section: 'Exportar', onRun: () => void downloadPdf(selectedMonth, selectedCategories, selectedType) },
+    { id: 'new-upload', label: 'Enviar novos extratos', section: 'Dados', onRun: goToRealUpload },
+    // Export hits the real backend against the current workspace -- there
+    // is none in demo mode, so these two commands simply don't exist there
+    // rather than producing a confusing failed-download error.
+    ...(!isDemo
+      ? [
+          { id: 'export-csv', label: 'Baixar CSV do mês selecionado', section: 'Exportar', onRun: () => void downloadCsv(selectedMonth, selectedCategories, selectedType) },
+          { id: 'export-pdf', label: 'Baixar PDF do mês selecionado', section: 'Exportar', onRun: () => void downloadPdf(selectedMonth, selectedCategories, selectedType) },
+        ]
+      : []),
     { id: 'help', label: 'Abrir central de ajuda', section: 'Ajuda', keywords: 'shortcuts atalhos', onRun: () => setShowHelp(true) },
     { id: 'tour', label: 'Ver o tour de boas-vindas', section: 'Ajuda', onRun: () => setShowTour(true) },
     ...effectiveMonths.map((m) => ({ id: `month-${m}`, label: `Ir para o mês ${m}`, section: 'Período', onRun: () => setSelectedMonth(m) })),
@@ -141,6 +178,8 @@ export default function DashboardPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6 print:max-w-full print:space-y-4 print:p-0">
       <CommandPalette commands={commands} />
+
+      {isDemo ? <DemoModeBanner onExit={goToRealUpload} /> : null}
 
       {showTour ? (
         <OnboardingTour
@@ -190,14 +229,19 @@ export default function DashboardPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setShowUpload(true)}
+                onClick={goToRealUpload}
                 className="rounded-lg bg-accent-strong px-3.5 py-2 text-xs font-semibold text-neutral-950 transition hover:brightness-110"
               >
                 Novo envio
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <GlobalSearch categories={selectedCategories} type={selectedType} onJumpToMonth={setSelectedMonth} />
+              <GlobalSearch
+                categories={selectedCategories}
+                type={selectedType}
+                onJumpToMonth={setSelectedMonth}
+                demoSource={isDemo ? demoSearch : undefined}
+              />
               {email ? <span className="hidden text-sm text-neutral-500 sm:inline">{email}</span> : null}
               <button
                 type="button"
@@ -229,35 +273,48 @@ export default function DashboardPage() {
               onYearChange={setSelectedYear}
               selectedMonth={selectedMonth}
               onMonthChange={setSelectedMonth}
-              allCategories={allCategoriesQuery.categories}
+              allCategories={allCategories}
               selectedCategories={selectedCategories}
               onCategoriesChange={setSelectedCategories}
               selectedType={selectedType}
               onTypeChange={setSelectedType}
-              categoryCounts={categoryCountsQuery.data?.counts}
-              resultCount={tab === 'Transações' ? transactionsQuery.data?.count : undefined}
+              categoryCounts={categoryCounts}
+              resultCount={tab === 'Transações' ? transactionsCount : undefined}
             />
-            <ExportButtons month={selectedMonth} categories={selectedCategories} type={selectedType} />
+            {!isDemo ? (
+              <ExportButtons month={selectedMonth} categories={selectedCategories} type={selectedType} />
+            ) : (
+              <span className="text-xs text-neutral-600">Exportar disponível com seus dados reais</span>
+            )}
           </div>
 
-          <SnapshotsBar
-            month={selectedMonth}
-            categories={selectedCategories}
-            type={selectedType}
-            onApply={(s) => {
-              setSelectedMonth(s.month)
-              setSelectedCategories(s.categories)
-              setSelectedType(s.type)
-            }}
-          />
+          {/* Snapshots are persisted on the real backend workspace (Fase 6)
+              -- there's nothing to save/list in demo mode, so the bar (and
+              its `useSnapshots(true)` call on mount) simply doesn't render. */}
+          {!isDemo ? (
+            <SnapshotsBar
+              month={selectedMonth}
+              categories={selectedCategories}
+              type={selectedType}
+              onApply={(s) => {
+                setSelectedMonth(s.month)
+                setSelectedCategories(s.categories)
+                setSelectedType(s.type)
+              }}
+            />
+          ) : null}
         </>
       ) : null}
 
-      {summaryQuery.data ? (
-        <KpiRow summary={summaryQuery.data.summary} deltas={summaryQuery.data.deltas} month={selectedMonth} />
+      {summaryData ? (
+        <KpiRow summary={summaryData.summary} deltas={summaryData.deltas} month={selectedMonth} />
       ) : null}
 
-      <AiInsights month={selectedMonth} categories={selectedCategories} type={selectedType} enabled={hasData} />
+      {isDemo ? (
+        <DemoInsights month={selectedMonth} categories={selectedCategories} type={selectedType} />
+      ) : (
+        <AiInsights month={selectedMonth} categories={selectedCategories} type={selectedType} enabled={hasData} />
+      )}
 
       {!presentationMode ? (
         <div className="flex gap-1 overflow-x-auto border-b border-surface-border print:hidden">
@@ -276,28 +333,28 @@ export default function DashboardPage() {
         </div>
       ) : null}
 
-      {tab === 'Visão Geral' && summaryQuery.data ? (
+      {tab === 'Visão Geral' && summaryData ? (
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-surface-border bg-surface-1 p-4">
             <h3 className="mb-2 text-sm font-medium text-neutral-300">Distribuição por categoria</h3>
-            <CategoryDonutChart data={summaryQuery.data.category_breakdown} />
+            <CategoryDonutChart data={summaryData.category_breakdown} />
           </div>
           <div className="rounded-2xl border border-surface-border bg-surface-1 p-4">
             <h3 className="mb-2 text-sm font-medium text-neutral-300">Maiores categorias de gasto</h3>
-            <TopCategoriesBarChart data={summaryQuery.data.category_breakdown} />
+            <TopCategoriesBarChart data={summaryData.category_breakdown} />
           </div>
         </div>
       ) : null}
 
-      {tab === 'Tendências' && summaryQuery.data ? (
+      {tab === 'Tendências' && summaryData ? (
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-surface-border bg-surface-1 p-4">
             <h3 className="mb-2 text-sm font-medium text-neutral-300">Receitas vs. despesas por mês</h3>
-            <MonthlyIncomeExpenseChart data={summaryQuery.data.monthly_series} />
+            <MonthlyIncomeExpenseChart data={summaryData.monthly_series} />
           </div>
           <div className="rounded-2xl border border-surface-border bg-surface-1 p-4">
             <h3 className="mb-2 text-sm font-medium text-neutral-300">Saldo acumulado</h3>
-            <CumulativeBalanceChart data={summaryQuery.data.monthly_series} />
+            <CumulativeBalanceChart data={summaryData.monthly_series} />
           </div>
         </div>
       ) : null}
@@ -305,8 +362,8 @@ export default function DashboardPage() {
       {tab === 'Mapa de Gastos' ? (
         <div className="rounded-2xl border border-surface-border bg-surface-1 p-4">
           <h3 className="mb-3 text-sm font-medium text-neutral-300">Categoria x mês</h3>
-          {trendQuery.data ? (
-            <CategoryMonthHeatmap transactions={trendQuery.data.transactions} />
+          {trendTransactions ? (
+            <CategoryMonthHeatmap transactions={trendTransactions} />
           ) : (
             <EmptyState icon="🗓️" title="Carregando..." subtitle="" />
           )}
@@ -318,23 +375,39 @@ export default function DashboardPage() {
           <div className="mb-2 text-xs text-neutral-500">
             {selectedMonth} · {selectedType}
           </div>
-          <TransactionsTable transactions={transactionsQuery.data?.transactions ?? []} />
+          <TransactionsTable transactions={transactions} />
         </div>
       ) : null}
 
       {tab === 'Análise' ? (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <AnomaliesPanel categories={selectedCategories} type={selectedType} enabled={hasData} />
-            <ComparePanel months={allMonths} categories={selectedCategories} type={selectedType} />
-          </div>
-        </Suspense>
+        isDemo ? (
+          <DemoLockedPanel
+            title="Análise avançada disponível com seus dados reais"
+            description="Detecção de gastos fora do padrão e comparação entre períodos usam o histórico completo que você enviar -- não fazem sentido sobre dados de exemplo."
+            onUpload={goToRealUpload}
+          />
+        ) : (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <AnomaliesPanel categories={selectedCategories} type={selectedType} enabled={hasData} />
+              <ComparePanel months={allMonths} categories={selectedCategories} type={selectedType} />
+            </div>
+          </Suspense>
+        )
       ) : null}
 
       {tab === 'Assistente IA' ? (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <AiAssistantPanel month={selectedMonth} categories={selectedCategories} type={selectedType} />
-        </Suspense>
+        isDemo ? (
+          <DemoLockedPanel
+            title="Assistente de IA disponível com seus dados reais"
+            description="As respostas do assistente são geradas só a partir dos dados que você enviar -- ainda não há nada real para responder sobre."
+            onUpload={goToRealUpload}
+          />
+        ) : (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <AiAssistantPanel month={selectedMonth} categories={selectedCategories} type={selectedType} />
+          </Suspense>
+        )
       ) : null}
     </div>
   )

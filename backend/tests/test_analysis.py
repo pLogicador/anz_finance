@@ -119,7 +119,7 @@ def _upload_valid_statement(client: TestClient, headers: dict) -> None:
 @respx.mock
 def test_anomalies_route_requires_data(client: TestClient) -> None:
     headers = _bridge_and_get_headers(client)
-    assert client.get("/analysis/anomalies", headers=headers).status_code == 410
+    assert client.get("/analysis/anomalies", headers=headers).status_code == 404
 
 
 def test_anomalies_route_requires_auth(client: TestClient) -> None:

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 
 import { formatCurrency, formatDateBr } from '@/design-system/format'
 
-import type { TypeFilter } from '../types'
+import type { Transaction, TypeFilter } from '../types'
 import { useSearch } from './hooks'
 
 /**
@@ -11,18 +11,26 @@ import { useSearch } from './hooks'
  * FULL uploaded history so a transaction can be found without knowing
  * which month it's in first; picking a result jumps the dashboard to that
  * transaction's month.
+ *
+ * `demoSource` (Fase 13): when provided, search runs entirely against this
+ * local array instead of calling the real `/workspace/search` endpoint --
+ * used in explore/demo mode, where there is no real backend workspace to
+ * query. Real (non-demo) usage is unaffected: the prop is simply omitted.
  */
 export function GlobalSearch({
   categories,
   type,
   onJumpToMonth,
+  demoSource,
 }: {
   categories: string[]
   type: TypeFilter
   onJumpToMonth: (month: string) => void
+  demoSource?: (query: string, categories: string[], type: TypeFilter) => Transaction[]
 }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
+  const [demoResults, setDemoResults] = useState<Transaction[]>([])
   const search = useSearch()
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -34,12 +42,17 @@ export function GlobalSearch({
       return
     }
     debounceRef.current = setTimeout(() => {
-      search.mutate({ q: value.trim(), categories, type })
+      if (demoSource) {
+        setDemoResults(demoSource(value.trim(), categories, type))
+      } else {
+        search.mutate({ q: value.trim(), categories, type })
+      }
       setOpen(true)
     }, 250)
   }
 
-  const results = search.data?.transactions.slice(0, 8) ?? []
+  const isPending = demoSource ? false : search.isPending
+  const results = (demoSource ? demoResults : (search.data?.transactions ?? [])).slice(0, 8)
 
   return (
     <div className="relative w-full max-w-[180px] sm:max-w-xs">
@@ -55,8 +68,8 @@ export function GlobalSearch({
 
       {open ? (
         <div className="absolute top-full right-0 left-0 z-10 mt-1 max-h-80 overflow-y-auto rounded-lg border border-surface-border bg-surface-1 shadow-lg">
-          {search.isPending ? <p className="p-3 text-xs text-neutral-500">Buscando...</p> : null}
-          {!search.isPending && results.length === 0 ? <p className="p-3 text-xs text-neutral-500">Nenhum resultado.</p> : null}
+          {isPending ? <p className="p-3 text-xs text-neutral-500">Buscando...</p> : null}
+          {!isPending && results.length === 0 ? <p className="p-3 text-xs text-neutral-500">Nenhum resultado.</p> : null}
           {results.map((t, i) => (
             <button
               key={i}

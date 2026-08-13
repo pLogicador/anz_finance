@@ -1,4 +1,4 @@
-import { getAccessToken } from '@/auth/session-store'
+import { getAccessToken, useSessionStore } from '@/auth/session-store'
 import { env } from '@/lib/env'
 
 import type { TypeFilter } from '../types'
@@ -30,6 +30,7 @@ async function downloadFile(path: string, filename: string): Promise<void> {
   if (token) headers.Authorization = `Bearer ${token}`
 
   const response = await fetch(`${env.apiBaseUrl}${path}`, { headers, cache: 'no-store' })
+  if (response.status === 401) useSessionStore.getState().clearSession()
   if (!response.ok) {
     const payload = await response.json().catch(() => null)
     const message = typeof payload?.detail === 'string' ? payload.detail : (payload?.detail?.message ?? 'Não foi possível gerar o arquivo.')

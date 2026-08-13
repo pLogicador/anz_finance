@@ -40,7 +40,7 @@ def test_snapshots_require_auth(client: TestClient) -> None:
 @respx.mock
 def test_snapshots_require_uploaded_data(client: TestClient) -> None:
     headers = _bridge_and_get_headers(client)
-    assert client.get("/workspace/snapshots", headers=headers).status_code == 410
+    assert client.get("/workspace/snapshots", headers=headers).status_code == 404
 
 
 @respx.mock

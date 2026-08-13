@@ -23,9 +23,9 @@ O backend nunca é a fonte de verdade sobre quem é o usuário ou se o plano del
 1. **Nenhum banco de dados, Redis ou armazenamento persistente** para dados do usuário, em nenhuma hipótese. Toda informação de uma sessão (extratos processados, transações classificadas, filtros salvos) vive num dicionário em memória do processo (`backend/app/workspace/store.py`), com expiração automática por tempo (TTL, 60 minutos por padrão) — reiniciar o processo do backend apaga tudo, por design.
 2. **O ANZ nunca vira uma segunda fonte de identidade.** O JWT que ele emite é só uma sessão técnica temporária, válida somente depois de uma checagem bem-sucedida contra a Syncron — nunca ganha um mecanismo de renovação próprio. Se expira, o usuário volta pra tela de bloqueio institucional (precisa passar pelo Hub de novo), nunca por um "renovar sessão" que não passe pela Syncron.
 
-## Os 6 estados de acesso
+## Os estados de acesso
 
-O frontend (`frontend/src/auth/`, `frontend/src/public-bundle/`) trata 6 situações distintas ao carregar:
+O frontend (`frontend/src/auth/`, `frontend/src/public-bundle/`) trata estas situações distintas ao carregar:
 
 | Estado | Quando acontece | Tela |
 |---|---|---|
@@ -33,10 +33,17 @@ O frontend (`frontend/src/auth/`, `frontend/src/public-bundle/`) trata 6 situaç
 | Autorizado | Bridge deu certo, JWT emitido | O dashboard de verdade (`AppShell`) |
 | Plano expirado | Syncron respondeu 403 (plano vencido) | `PlanExpiredScreen` |
 | Token inválido/ausente | Sem `?token=` na URL, ou Syncron respondeu 401/404 | `InstitutionalBlockScreen` |
-| Sessão de trabalho expirada | JWT ainda válido, mas os dados da sessão (upload) expiraram | `WorkSessionExpiredNotice` — aparece **dentro** do dashboard, não manda o usuário de volta ao Hub |
+| Sem dados ainda | JWT válido, sessão de trabalho existe e não expirou, mas nada foi enviado ainda (backend responde 404 `no_data_yet`) | `WelcomeHub` — dentro do dashboard: escolher entre enviar extratos reais ou explorar com dados de exemplo (Fase 13) |
+| Sessão de trabalho expirada | JWT ainda válido, mas os dados de uma sessão que **já tinha** upload expiraram (backend responde 410 `work_session_expired`) | `WorkSessionExpiredNotice` — aparece **dentro** do dashboard, não manda o usuário de volta ao Hub |
 | Serviço indisponível | `subscription_access_api` não respondeu (timeout/5xx) | `ServiceUnavailableScreen`, com botão de tentar de novo |
 
+"Sem dados ainda" e "Sessão de trabalho expirada" usam `error_code`s diferentes de propósito (`no_data_yet` vs. `work_session_expired`, ver `backend/app/workspace/deps.py`) — antes da Fase 13 os dois colapsavam no mesmo código, o que fazia todo usuário de primeira viagem ver uma mensagem de "sua sessão expirou" sem nunca ter enviado nada.
+
 O bundle JS do dashboard autenticado só é buscado pelo navegador depois que o estado "Autorizado" é confirmado (`React.lazy` no roteador, `frontend/src/app/router.tsx`) — isso é verificável na aba de rede do navegador e é uma exigência explícita do modelo de acesso, não só uma otimização.
+
+## Explorar com dados de exemplo (Fase 13)
+
+Um usuário autenticado que ainda não enviou nada pode explorar o painel real (KPIs, gráficos, tabela de transações, filtros, busca) populado com um dataset fixo e fictício de 3 meses (`frontend/src/dashboard/demo/demo-data.ts`), sem enviar nada e sem nenhuma chamada ao backend real — todo o cálculo (resumo, série mensal, distribuição por categoria, busca) é feito no próprio navegador, com as mesmas regras de filtro do backend real (categoria vazia = sem filtro; Receitas = valor ≥ 0). Recursos que dependem de verdade do workspace do backend (exportar CSV/PDF, salvar snapshots, detecção de anomalias, comparação entre períodos, assistente de IA) ficam desabilitados ou mostram um aviso/estado bloqueado explicando que precisam de dados reais — nunca chamam o backend com uma sessão vazia. Uma faixa fixa no topo do painel ("Você está explorando com dados de exemplo") deixa isso sempre visível, com um atalho direto para o formulário de envio real.
 
 ## Pipeline de dados
 

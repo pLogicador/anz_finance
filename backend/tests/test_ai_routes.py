@@ -131,7 +131,9 @@ def test_test_connection_unknown_provider_is_400(client: TestClient) -> None:
 def test_insights_requires_uploaded_data(client: TestClient) -> None:
     headers = _bridge_and_get_headers(client)
     response = client.get("/ai/insights", headers=headers, params={"month": "2026-01"})
-    assert response.status_code == 410
+    # Fase 13: a freshly-bridged, never-uploaded session is `no_data_yet`
+    # (404), not `work_session_expired` (410) -- see workspace/deps.py.
+    assert response.status_code == 404
 
 
 @respx.mock
@@ -159,7 +161,7 @@ def test_ask_requires_auth(client: TestClient) -> None:
 def test_ask_requires_uploaded_data(client: TestClient) -> None:
     headers = _bridge_and_get_headers(client)
     response = client.post("/ai/ask", headers=headers, json={"question": "qual foi minha maior categoria?", "month": "2026-01"})
-    assert response.status_code == 410
+    assert response.status_code == 404
 
 
 @respx.mock

@@ -9,6 +9,15 @@ Only the states a *backend* decision can produce live here:
 - ``WORK_SESSION_EXPIRED`` (PARTE 4 workspace TTL, not the auth session)
   lives in ``app/workspace/store.py`` since it's about workspace data, not
   the Syncron token bridge.
+- ``NO_DATA_YET`` (Fase 13) is the sibling of ``WORK_SESSION_EXPIRED`` for a
+  workspace entry that exists, hasn't expired, and simply never had a
+  payload set -- i.e. a freshly-bridged session that hasn't uploaded
+  anything yet. See ``app/workspace/deps.py`` for why this needs to be a
+  distinct code from ``WORK_SESSION_EXPIRED``: the frontend shows a very
+  different screen for "you're new here, want to explore first?" than for
+  "you had data, it's gone, please resend" -- collapsing them (the original
+  Fase 1-3 design) meant a brand-new user always saw a spurious "sua sessão
+  expirou" message before ever uploading anything.
 
 The remaining three map 1:1 to a distinct HTTP status + machine-readable
 ``error_code`` the frontend switches on to choose which of the 6 screens to
@@ -25,6 +34,7 @@ class AccessErrorCode(StrEnum):
     PLAN_EXPIRED = "plan_expired"
     AUTH_SERVICE_UNAVAILABLE = "auth_service_unavailable"
     WORK_SESSION_EXPIRED = "work_session_expired"
+    NO_DATA_YET = "no_data_yet"
 
 
 class SyncronAccessError(Exception):

@@ -92,7 +92,7 @@ def test_export_csv_requires_auth(client: TestClient) -> None:
 @respx.mock
 def test_export_csv_requires_data(client: TestClient) -> None:
     headers = _bridge_and_get_headers(client)
-    assert client.get("/workspace/export/csv", headers=headers, params={"month": "2026-01"}).status_code == 410
+    assert client.get("/workspace/export/csv", headers=headers, params={"month": "2026-01"}).status_code == 404
 
 
 @respx.mock
@@ -127,7 +127,7 @@ def test_export_csv_respects_the_type_filter(client: TestClient) -> None:
 @respx.mock
 def test_export_pdf_requires_data(client: TestClient) -> None:
     headers = _bridge_and_get_headers(client)
-    assert client.get("/workspace/export/pdf", headers=headers, params={"month": "2026-01"}).status_code == 410
+    assert client.get("/workspace/export/pdf", headers=headers, params={"month": "2026-01"}).status_code == 404
 
 
 @respx.mock

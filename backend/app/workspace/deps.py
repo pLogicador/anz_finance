@@ -15,12 +15,21 @@ def get_workspace_payload(
 ) -> WorkspacePayload:
     """Resolves the current session's uploaded/classified data.
 
-    Both "never uploaded anything" and "uploaded, but the TTL lapsed" map
-    to the same PARTE 5.6 state 5 response -- from the frontend's
-    perspective, both mean "prompt the user to (re-)upload", not two
-    different screens. The auth session (JWT) may still be perfectly
-    valid here -- that's the whole point of this being a distinct state
-    from token-invalid/plan-expired.
+    Fase 13 revision: "never uploaded anything" and "uploaded, but the TTL
+    lapsed" used to collapse into the same PARTE 5.6 state 5 response --
+    that made sense before the frontend had anything else to offer a
+    dataless session, but once a real first-run experience (a welcome
+    screen with an "explore with example data" option) existed, a brand
+    new user always seeing a "sua sessão de trabalho expirou" message
+    (false -- nothing had expired, they'd simply never uploaded yet) was
+    actively hiding that experience behind a misleading error state. The
+    two cases are structurally distinguishable already: the workspace
+    entry itself is missing/past its TTL (``WorkSessionExpired``/
+    ``WorkSessionNotFound``, thrown by the store) vs. the entry exists and
+    is live but its ``payload`` was never set (a brand-new entry from
+    ``POST /auth/bridge``, see ``app/access/routes.py``). The auth session
+    (JWT) may still be perfectly valid in either case -- that's the whole
+    point of this being a distinct state from token-invalid/plan-expired.
     """
     try:
         payload = store.get_payload(session.workspace_id)
@@ -32,7 +41,7 @@ def get_workspace_payload(
 
     if payload is None:
         raise HTTPException(
-            status_code=410,
-            detail={"error_code": AccessErrorCode.WORK_SESSION_EXPIRED, "message": "Nenhum extrato enviado nesta sessão ainda."},
+            status_code=404,
+            detail={"error_code": AccessErrorCode.NO_DATA_YET, "message": "Nenhum extrato enviado nesta sessão ainda."},
         )
     return payload

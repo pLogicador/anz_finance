@@ -103,13 +103,18 @@ def test_transactions_and_trend_and_summary_reflect_uploaded_data(client: TestCl
 
 
 @respx.mock
-def test_reading_workspace_without_ever_uploading_is_work_session_expired(client: TestClient) -> None:
+def test_reading_workspace_without_ever_uploading_is_no_data_yet(client: TestClient) -> None:
+    # Fase 13: distinct from a *genuinely expired* workspace (see
+    # test_workspace_ttl_recovery.py) -- a freshly-bridged session that
+    # simply hasn't uploaded anything yet gets its own error_code so the
+    # frontend can route it to the WelcomeHub/explore-mode screen instead
+    # of a misleading "sua sessão expirou" notice.
     headers = _bridge_and_get_headers(client)
 
     response = client.get("/workspace/transactions", headers=headers, params={"month": "2026-01"})
 
-    assert response.status_code == 410
-    assert response.json()["detail"]["error_code"] == "work_session_expired"
+    assert response.status_code == 404
+    assert response.json()["detail"]["error_code"] == "no_data_yet"
 
 
 def test_upload_without_auth_is_401(client: TestClient) -> None:
