@@ -2,6 +2,11 @@
 
 Este é um runbook para uma pessoa com acesso às contas Railway/Vercel/Groq/OpenAI/Syncron executar o deploy manualmente. Nenhuma etapa aqui foi executada por mim — publicar em infraestrutura de nuvem real, com credenciais de produção, é uma ação que exige as contas e a decisão explícita de quem está de fato colocando o serviço no ar, então o que existe hoje no repositório é a **configuração pronta pra isso** (`backend/railway.toml`, `frontend/vercel.json`), não um deploy já feito.
 
+## Ambiente real de produção (confirmado 2026-08-18)
+
+- **Backend**: `https://anzfinance-production.up.railway.app/` — **Railway**, confirmado ao vivo (`GET /health` 200, `GET /openapi.json` com `"title": "ANZ Finance API"`) durante a integração com o Syncron Core.
+- Esta seção do CLAUDE.md/deste runbook (Fase 10, "nenhum deploy real foi executado") ficou desatualizada — o serviço foi implantado depois daquela fase, sem deixar rastro documentado. Mesmo padrão já visto em Live Scheduler/FlexiPage/Docksmith durante esta mesma integração: a documentação "ainda não implantado" não é mais confiável como fonte de verdade sobre deploy em nenhum produto do ecossistema — sempre confirmar ao vivo antes de assumir.
+
 Como o repositório é um monorepo (backend e frontend na mesma raiz de git), tanto o Railway quanto a Vercel precisam ser configurados com o **diretório raiz** apontando pra subpasta certa — veja abaixo.
 
 ## Pré-requisitos
