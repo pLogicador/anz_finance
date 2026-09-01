@@ -224,7 +224,7 @@ export default function DashboardPage() {
                 <LogoMark size={32} />
                 <div>
                   <p className="text-xs text-neutral-500">ANZ Finance</p>
-                  <h1 className="text-xl font-semibold text-neutral-50">Painel financeiro</h1>
+                  <h1 className="font-display text-xl font-semibold text-neutral-50">Painel financeiro</h1>
                 </div>
               </div>
               <button
@@ -263,7 +263,7 @@ export default function DashboardPage() {
           </header>
 
           {/* print-only heading -- the interactive header above is hidden entirely when printing/exporting to PDF via the browser */}
-          <h1 className="hidden text-xl font-semibold text-neutral-950 print:block">ANZ Finance -- Painel financeiro ({selectedMonth})</h1>
+          <h1 className="font-display hidden text-xl font-semibold text-neutral-950 print:block">ANZ Finance -- Painel financeiro ({selectedMonth})</h1>
 
           <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
             <FiltersBar
@@ -335,11 +335,11 @@ export default function DashboardPage() {
 
       {tab === 'Visão Geral' && summaryData ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border border-surface-border bg-surface-1 p-4">
+          <div className="glass-panel p-4">
             <h3 className="mb-2 text-sm font-medium text-neutral-300">Distribuição por categoria</h3>
             <CategoryDonutChart data={summaryData.category_breakdown} />
           </div>
-          <div className="rounded-2xl border border-surface-border bg-surface-1 p-4">
+          <div className="glass-panel p-4">
             <h3 className="mb-2 text-sm font-medium text-neutral-300">Maiores categorias de gasto</h3>
             <TopCategoriesBarChart data={summaryData.category_breakdown} />
           </div>
@@ -348,11 +348,11 @@ export default function DashboardPage() {
 
       {tab === 'Tendências' && summaryData ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border border-surface-border bg-surface-1 p-4">
+          <div className="glass-panel p-4">
             <h3 className="mb-2 text-sm font-medium text-neutral-300">Receitas vs. despesas por mês</h3>
             <MonthlyIncomeExpenseChart data={summaryData.monthly_series} />
           </div>
-          <div className="rounded-2xl border border-surface-border bg-surface-1 p-4">
+          <div className="glass-panel p-4">
             <h3 className="mb-2 text-sm font-medium text-neutral-300">Saldo acumulado</h3>
             <CumulativeBalanceChart data={summaryData.monthly_series} />
           </div>
@@ -360,7 +360,7 @@ export default function DashboardPage() {
       ) : null}
 
       {tab === 'Mapa de Gastos' ? (
-        <div className="rounded-2xl border border-surface-border bg-surface-1 p-4">
+        <div className="glass-panel p-4">
           <h3 className="mb-3 text-sm font-medium text-neutral-300">Categoria x mês</h3>
           {trendTransactions ? (
             <CategoryMonthHeatmap transactions={trendTransactions} />

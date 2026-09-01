@@ -10,6 +10,7 @@ const ERROR_ROUTES: Record<AccessErrorCode, string> = {
   [AccessErrorCode.TOKEN_INVALID_OR_MISSING]: '/blocked/token',
   [AccessErrorCode.AUTH_SERVICE_UNAVAILABLE]: '/blocked/service-unavailable',
   [AccessErrorCode.WORK_SESSION_EXPIRED]: '/blocked/token', // never produced by the bridge itself
+  [AccessErrorCode.NO_DATA_YET]: '/app', // never produced by the bridge itself either -- see access-errors.ts
 }
 
 /**

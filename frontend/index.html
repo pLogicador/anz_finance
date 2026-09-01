@@ -5,7 +5,22 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ANZ Finance</title>
-    <!-- favicon.svg is still the Vite placeholder -- real brand identity is Fase 4 -->
+    <!--
+      Fase 14 -- Inter (--font-sans) was referenced in index.css's @theme
+      since Fase 4 but never actually loaded here, so every page has been
+      silently falling back to the OS system font the whole time. Fixed
+      alongside adding Sora (--font-display) for headings/KPI numbers --
+      a face of its own, distinct from Inter (body/UI) and from the Space
+      Grotesk the Syncron Hub uses for its own headings, per the explicit
+      goal that each product in the ecosystem read as visually its own
+      tool rather than a re-skin of the same one.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
     <div id="root"></div>

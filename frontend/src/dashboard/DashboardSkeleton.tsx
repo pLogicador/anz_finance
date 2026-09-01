@@ -7,7 +7,7 @@
  * index.css's global rule) automatically.
  */
 function Block({ className }: { className?: string }) {
-  return <div className={`rounded-xl bg-surface-1 motion-safe:animate-pulse ${className ?? ''}`} />
+  return <div className={`rounded-2xl bg-surface-1/70 backdrop-blur-xl motion-safe:animate-pulse ${className ?? ''}`} />
 }
 
 export function DashboardSkeleton() {

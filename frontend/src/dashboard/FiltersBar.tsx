@@ -51,7 +51,7 @@ export function FiltersBar({
   }
 
   return (
-    <div className="w-full rounded-2xl border border-surface-border bg-surface-1 p-3">
+    <div className="glass-panel w-full p-3">
       <div className="flex flex-wrap items-center gap-3">
         <div>
           <label className="mb-1 block text-[10px] font-medium tracking-wide text-neutral-600 uppercase">Período</label>

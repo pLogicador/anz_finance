@@ -59,7 +59,7 @@ function Hero() {
           <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden />
           Um serviço do ecossistema Syncron
         </p>
-        <h1 className="text-4xl leading-[1.08] font-semibold tracking-tight text-neutral-50 sm:text-5xl lg:text-[3.4rem]">
+        <h1 className="font-display text-4xl leading-[1.08] font-semibold tracking-tight text-neutral-50 sm:text-5xl lg:text-[3.4rem]">
           Entenda seus dados.
           <br />
           Tome decisões <span className="text-accent">melhores</span>.
@@ -105,7 +105,7 @@ function ProblemSolution() {
         <div className="grid gap-8 sm:grid-cols-2 sm:gap-6">
           <div className="rounded-2xl border border-surface-border bg-surface-1 p-6 sm:p-7">
             <p className="mb-3 text-xs font-medium tracking-wide text-neutral-500 uppercase">O problema</p>
-            <h2 className="text-xl font-semibold text-neutral-50 sm:text-2xl">Seu extrato bancário não conta a história toda.</h2>
+            <h2 className="font-display text-xl font-semibold text-neutral-50 sm:text-2xl">Seu extrato bancário não conta a história toda.</h2>
             <p className="mt-3 text-sm leading-relaxed text-neutral-400 sm:text-base">
               Uma lista de transações não mostra pra onde o dinheiro realmente vai, o que mudou entre um mês e outro, ou o que
               merece sua atenção. Entender isso à mão, numa planilha, toma tempo que ninguém tem sobrando.
@@ -113,7 +113,7 @@ function ProblemSolution() {
           </div>
           <div className="rounded-2xl border border-accent/30 bg-accent-soft p-6 sm:p-7">
             <p className="mb-3 text-xs font-medium tracking-wide text-accent uppercase">Como o ANZ resolve</p>
-            <h2 className="text-xl font-semibold text-neutral-50 sm:text-2xl">
+            <h2 className="font-display text-xl font-semibold text-neutral-50 sm:text-2xl">
               A IA categoriza. O painel explica. Você decide.
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-neutral-300 sm:text-base">
@@ -141,7 +141,7 @@ function Features() {
     <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
       <div className="mx-auto max-w-xl text-center">
         <p className="mb-3 text-xs font-medium tracking-wide text-neutral-500 uppercase">O que você pode fazer</p>
-        <h2 className="text-2xl font-semibold text-neutral-50 sm:text-3xl">Tudo que você precisa, nada que você não usa.</h2>
+        <h2 className="font-display text-2xl font-semibold text-neutral-50 sm:text-3xl">Tudo que você precisa, nada que você não usa.</h2>
       </div>
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {FEATURES.map((f) => (
@@ -170,7 +170,7 @@ function HowItWorks() {
       <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
         <div className="mx-auto max-w-xl text-center">
           <p className="mb-3 text-xs font-medium tracking-wide text-neutral-500 uppercase">Como funciona</p>
-          <h2 className="text-2xl font-semibold text-neutral-50 sm:text-3xl">Do extrato ao insight, em 5 passos.</h2>
+          <h2 className="font-display text-2xl font-semibold text-neutral-50 sm:text-3xl">Do extrato ao insight, em 5 passos.</h2>
         </div>
 
         {/* Native horizontal scroll-snap on mobile (real swipe, no custom gesture JS needed); a normal grid from sm upward. */}
@@ -198,7 +198,7 @@ function AiSpotlight() {
       <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
         <div>
           <p className="mb-3 text-xs font-medium tracking-wide text-neutral-500 uppercase">Inteligência artificial</p>
-          <h2 className="text-2xl font-semibold text-neutral-50 sm:text-3xl">Não é um botão de "perguntar à IA". É um assistente de verdade.</h2>
+          <h2 className="font-display text-2xl font-semibold text-neutral-50 sm:text-3xl">Não é um botão de "perguntar à IA". É um assistente de verdade.</h2>
           <p className="mt-4 text-base leading-relaxed text-neutral-400">
             Pergunte com suas próprias palavras -- "qual foi minha maior variação?", "o que merece minha atenção?", "compare os
             dois períodos" -- e a resposta vem só dos dados reais da sua sessão. A IA nunca inventa números que não existem no
@@ -231,7 +231,7 @@ function SecuritySection() {
     <section className="border-t border-surface-border/60 bg-surface-1/40">
       <div className="mx-auto max-w-4xl px-5 py-16 text-center sm:px-8 sm:py-20">
         <p className="mb-3 text-xs font-medium tracking-wide text-neutral-500 uppercase">Seus dados</p>
-        <h2 className="text-2xl font-semibold text-neutral-50 sm:text-3xl">Sem cadastro novo. Sem dado guardado além da sua sessão.</h2>
+        <h2 className="font-display text-2xl font-semibold text-neutral-50 sm:text-3xl">Sem cadastro novo. Sem dado guardado além da sua sessão.</h2>
         <div className="mt-8 grid gap-4 text-left sm:grid-cols-3">
           {[
             { title: 'Sua conta já é a Syncron', text: 'O ANZ nunca pede um login próprio -- ele confirma seu acesso direto com a Syncron, uma vez, e pronto.' },
@@ -252,7 +252,7 @@ function SecuritySection() {
 function FinalCta() {
   return (
     <section className="mx-auto max-w-4xl px-5 py-20 text-center sm:px-8 sm:py-28">
-      <h2 className="text-2xl font-semibold text-neutral-50 sm:text-4xl">Pronto para ver seus dados com clareza?</h2>
+      <h2 className="font-display text-2xl font-semibold text-neutral-50 sm:text-4xl">Pronto para ver seus dados com clareza?</h2>
       <p className="mx-auto mt-4 max-w-md text-base text-neutral-400">
         Entre com sua conta Syncron -- não precisa criar nada novo, o acesso é imediato.
       </p>

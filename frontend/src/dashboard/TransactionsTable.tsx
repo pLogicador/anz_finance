@@ -28,7 +28,7 @@ export function TransactionsTable({ transactions }: { transactions: Transaction[
   }
 
   return (
-    <div className="rounded-2xl border border-surface-border bg-surface-1">
+    <div className="glass-panel">
       <div className="flex items-center gap-3 border-b border-surface-border p-3">
         <input
           value={search}

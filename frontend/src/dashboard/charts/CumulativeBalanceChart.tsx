@@ -30,7 +30,7 @@ export function CumulativeBalanceChart({ data }: { data: MonthlySeriesRow[] }) {
           <XAxis dataKey="Mês" tick={{ fill: '#9ca89f', fontSize: 12 }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fill: '#9ca89f', fontSize: 12 }} axisLine={false} tickLine={false} />
           <Tooltip
-            contentStyle={{ background: '#121613', border: '1px solid #232b26', borderRadius: 8, fontSize: 12 }}
+            contentStyle={{ background: 'rgba(18, 22, 19, 0.92)', border: '1px solid rgba(35, 43, 38, 0.9)', borderRadius: 10, fontSize: 12, backdropFilter: 'blur(8px)' }}
             formatter={(value) => formatCurrency(Number(value))}
           />
           <Area type="monotone" dataKey="SaldoAcumulado" stroke="#34d399" strokeWidth={2} fill="url(#balanceFill)" />

@@ -26,7 +26,7 @@ function Delta({ delta, invert }: DeltaProps) {
 export function KpiRow({ summary, deltas, month }: { summary: PeriodSummary; deltas: { income: number | null; expense: number | null; net: number | null }; month: string }) {
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
-      <div className="col-span-2 rounded-2xl border border-accent/25 bg-accent-soft p-5 lg:col-span-1">
+      <div className="glass-panel-hero col-span-2 p-5 lg:col-span-1">
         <div className="flex items-center gap-1.5">
           <p className="text-xs font-medium tracking-wide text-neutral-400 uppercase">Saldo do período</p>
           <InfoTooltip>
@@ -34,7 +34,7 @@ export function KpiRow({ summary, deltas, month }: { summary: PeriodSummary; del
             selecionados nos filtros.
           </InfoTooltip>
         </div>
-        <p className="mt-2 text-3xl font-semibold text-neutral-50 sm:text-4xl">{formatCurrency(summary.net)}</p>
+        <p className="font-display mt-2 text-4xl font-bold tabular-nums text-neutral-50 sm:text-5xl">{formatCurrency(summary.net)}</p>
         <Delta delta={deltas.net} />
         <div className="mt-4 border-t border-accent/20 pt-3 text-xs text-neutral-400">
           {summary.top_category ? (
@@ -47,15 +47,15 @@ export function KpiRow({ summary, deltas, month }: { summary: PeriodSummary; del
         </div>
       </div>
 
-      <div className="rounded-2xl border border-surface-border bg-surface-1 p-4">
+      <div className="glass-panel p-4">
         <p className="text-xs font-medium tracking-wide text-neutral-500 uppercase">Receitas</p>
-        <p className="mt-1.5 text-xl font-semibold text-neutral-50">{formatCurrency(summary.income)}</p>
+        <p className="font-display mt-1.5 text-xl font-semibold tabular-nums text-neutral-50">{formatCurrency(summary.income)}</p>
         <Delta delta={deltas.income} />
       </div>
 
-      <div className="rounded-2xl border border-surface-border bg-surface-1 p-4">
+      <div className="glass-panel p-4">
         <p className="text-xs font-medium tracking-wide text-neutral-500 uppercase">Despesas</p>
-        <p className="mt-1.5 text-xl font-semibold text-neutral-50">{formatCurrency(Math.abs(summary.expense))}</p>
+        <p className="font-display mt-1.5 text-xl font-semibold tabular-nums text-neutral-50">{formatCurrency(Math.abs(summary.expense))}</p>
         <Delta delta={deltas.expense} invert />
       </div>
     </div>

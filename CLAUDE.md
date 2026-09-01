@@ -123,6 +123,101 @@ Pedido explícito do usuário: um usuário autenticado via Syncron que ainda nã
 
 **Validado com os servidores reais rodando localmente** (mock Syncron : 9100, backend ANZ : 9101, frontend : 5173 -- Chrome extension não conectada nesta sessão, mesma abordagem de scripts Playwright ad-hoc já usada em fases anteriores): fluxo completo bridge -> `WelcomeHub` -> "Explorar com dados de exemplo" -> as 6 abas (incluindo as 2 com estado bloqueado) -> sair do demo -> upload real de `valid_statement.ofx` -> dashboard real com export/snapshots disponíveis, tudo com zero erro de console real (só o mesmo ruído esperado de uma resposta 404/410 aparecendo no log de rede do Chromium, já documentado em fases anteriores para o caso 410). Responsividade: zero overflow horizontal em 1440px e 390px, tanto no `WelcomeHub` quanto no dashboard em modo demo. 166/166 pytest (backend) e 35/35 vitest (frontend) passando, `tsc -b` e `vite build` limpos (`public-bundle` continua ~19,9KB, inalterado -- nada do modo demo vazou pro bundle público; `AppShell` cresceu de 436KB para 454KB, esperado pelo dataset/lógica novos).
 
+## Fase 14 — Tipografia própria (primeira fatia do "REDESIGN TOTAL" adiado na Fase 11)
+
+Continuação da diretriz registrada e deliberadamente adiada na Fase 11
+("REDESIGN TOTAL DO ANZ FINANCE" — design system completo, tabelas
+redesenhadas, layouts mobile por componente, estados vazios/erro
+redesenhados, command palette/onboarding revisados, escala tipográfica
+editorial). Aquela diretriz inteira é, sozinha, do tamanho de várias
+fases já documentadas neste arquivo — esta rodada entrega só a fatia de
+maior alavancagem pro pedido concreto que a motivou (cada ferramenta do
+ecossistema Syncron com sua própria identidade tipográfica, não uma
+repetição da fonte do Hub): tipografia própria + correção de 1 bug real
+que bloqueava até o build compilar. O resto da diretriz (tabelas,
+mobile específico, estados vazios, command palette sob os novos
+princípios) segue registrado, não abandonado.
+
+**Estado herdado, não sobrescrito**: ao iniciar esta rodada, havia 11
+arquivos não commitados no working tree (2026-09-01), uma "Fase 5 do
+redesign do ecossistema" — utilities `glass-panel`/`glass-panel-hero`
+(`index.css`) aplicando um tratamento "glass" (blur/borda translúcida/
+sombra) sobre a mesma paleta emerald/near-black já existente, substituindo
+uma string repetida em ~10 componentes do dashboard. Confirmado que
+compilava e passava nos testes antes de construir em cima — essa rodada
+não descarta nem reescreve esse trabalho, só adiciona a camada
+tipográfica sobre ele.
+
+**Bug real, pré-existente, encontrado ao rodar `npm run build` antes de
+qualquer mudança**: `AccessErrorCode.NO_DATA_YET` (adicionado na Fase 13)
+nunca tinha sido incluído no `ERROR_ROUTES: Record<AccessErrorCode,
+string>` de `src/auth/HubBridgeGate.tsx` — o `tsc -b` falhava com
+"Property 'no_data_yet' is missing", bloqueando qualquer build (não só
+desta rodada — o repositório inteiro estava com o build quebrado desde a
+Fase 13, sem ninguém ter rodado `npm run build` depois). Corrigido
+mapeando `[AccessErrorCode.NO_DATA_YET]: '/app'` — o código conceitualmente
+nunca é produzido pela troca do bridge (é um erro de camada de dados do
+workspace, não de autenticação, ver o comentário em `access-errors.ts`),
+mas o tipo exige exaustividade; `/app` é o destino seguro caso ele algum
+dia apareça aí de qualquer forma, já que uma sessão sem dados ainda é um
+estado válido e não-bloqueado (tratado pelo próprio `WelcomeHub` dentro
+do dashboard, Fase 13).
+
+**Tipografia**: `index.html` nunca de fato carregava `Inter` — o token
+`--font-sans: 'Inter', ...` existia desde a Fase 4, mas sem nenhum
+`<link>`/`@import` correspondente, então todo o app renderizava com a
+fonte do sistema operacional o tempo inteiro (mesma classe de bug já
+documentada e corrigida 2× no Hub nesta mesma sessão de trabalho — "fonte
+referenciada mas nunca carregada"). Corrigido junto com a adição da fonte
+de destaque: `index.html` agora carrega Inter (400/500/600/700) e **Sora**
+(600/700/800) via Google Fonts (`preconnect`+`display=swap`, mesmo
+mecanismo já usado no Hub). Novo token `--font-display: 'Sora',
+var(--font-sans)` em `index.css`'s `@theme` — Tailwind v4 gera a utility
+`font-display` automaticamente a partir desse nome de token. Sora foi
+escolhida por ser geométrica, com números confiantes/tabulares (adequado
+a um painel financeiro), e deliberadamente distinta tanto de Inter (fica
+como face de corpo/interface) quanto do Space Grotesk que o Hub usa pros
+próprios headings — cada produto do ecossistema com sua própria voz
+tipográfica, não um re-skin do Hub.
+
+**Aplicação estratégica, não em todo texto** (mesmo princípio "papel
+visual, não tag HTML" já usado no Hub nesta sessão): `font-display` +
+`tabular-nums` nos 3 valores monetários do `KpiRow.tsx` (Saldo/Receitas/
+Despesas); `font-display` no wordmark (`Logo.tsx`), nos 8 headings h1/h2
+da landing page (`LandingPage.tsx`) e nos 3 valores monetários do mockup
+que a landing usa (`DashboardPreview.tsx`, mesma treatment do KPI real,
+por consistência visual entre a prévia e o painel de verdade); nos 2 `<h1>`
+do `DashboardPage.tsx` (título "Painel financeiro", tela e versão de
+impressão); no `<h1>` compartilhado pelas 3 telas de bloqueio de acesso
+(`BlockScreen.tsx`). **Não tocado, deliberadamente**: os 5 `<h3>` de
+rótulo de gráfico (título pequeno de widget, papel de "interface", não de
+"título") e todo o resto do texto de corpo/rótulo/tabela — continuam em
+Inter.
+
+**Validado**: `tsc -b`/`vite build` limpos (chunk `public-bundle`
+19,92KB→20,13KB, variação mínima esperada das novas classes; `AppShell`
+praticamente inalterado — a separação public/authenticated bundle
+continua intacta), 35/35 vitest passando. Testado num navegador real
+(Playwright, `dist/` servido localmente, bridge mockado via
+`page.route` — mesma técnica já validada em fases anteriores deste
+repositório): landing page e painel em modo demonstração (Fase 13, sem
+precisar de upload real nem chave de IA) em desktop (1440px) e mobile
+(390px), `getComputedStyle` confirmando `font-family` resolvendo pra
+`Sora, Inter, ...` nos headings e nos valores de KPI reais, zero overflow
+horizontal em ambas as larguras, zero erro de console real (só o mesmo
+ruído de rede já esperado de um endpoint não-mockado, `ERR_CONNECTION_
+REFUSED`, sem efeito na renderização). Screenshots conferidos
+visualmente — tratamento "glass" da Fase 5 preservado intacto, tipografia
+nova coesa nos dois breakpoints.
+
+**Fora do escopo desta rodada, registrado, não abandonado** (mesmos itens
+já listados como pendentes na Fase 11): tabelas redesenhadas sob os
+mesmos princípios editoriais, layouts mobile específicos por componente
+além do que a Fase 12 já fez, estados vazios/erro redesenhados, command
+palette/onboarding revisados, escala tipográfica formal com tokens de
+espaçamento nomeados (hoje só cor/radius têm tokens formais, tipografia
+ganhou só a face, não uma escala completa de tamanhos/pesos nomeados).
+
 ## Running locally, testing, deploy
 
 See `docs/` (added in Fase 10) for the up-to-date, reader-facing versions of this: `docs/RUNNING_LOCALLY.md` (backend/frontend/mock-Syncron/tests), `docs/ARCHITECTURE.md` (how the system works), `docs/DEPLOY.md` (Railway backend + Vercel frontend runbook). This CLAUDE.md file stays the phase-by-phase session log; `docs/` is the operator-facing manual.

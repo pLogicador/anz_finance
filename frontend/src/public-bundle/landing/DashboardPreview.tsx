@@ -47,17 +47,17 @@ export function DashboardPreview({ className }: { className?: string }) {
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
           <div className="rounded-xl border border-surface-border bg-surface-2 p-2.5 sm:p-3">
             <p className="text-[9px] font-medium tracking-wide text-neutral-500 uppercase sm:text-[10px]">Receitas</p>
-            <p className="mt-1 text-sm font-semibold text-neutral-50 sm:text-base">R$ 8.450</p>
+            <p className="font-display mt-1 text-sm font-semibold tabular-nums text-neutral-50 sm:text-base">R$ 8.450</p>
             <p className="mt-0.5 text-[10px] font-medium text-accent">+6,2%</p>
           </div>
           <div className="rounded-xl border border-surface-border bg-surface-2 p-2.5 sm:p-3">
             <p className="text-[9px] font-medium tracking-wide text-neutral-500 uppercase sm:text-[10px]">Despesas</p>
-            <p className="mt-1 text-sm font-semibold text-neutral-50 sm:text-base">R$ 3.120</p>
+            <p className="font-display mt-1 text-sm font-semibold tabular-nums text-neutral-50 sm:text-base">R$ 3.120</p>
             <p className="mt-0.5 text-[10px] font-medium text-red-400">+2,8%</p>
           </div>
           <div className="rounded-xl border border-accent/30 bg-accent-soft p-2.5 sm:p-3">
             <p className="text-[9px] font-medium tracking-wide text-neutral-400 uppercase sm:text-[10px]">Saldo</p>
-            <p className="mt-1 text-sm font-semibold text-neutral-50 sm:text-base">R$ 5.330</p>
+            <p className="font-display mt-1 text-sm font-semibold tabular-nums text-neutral-50 sm:text-base">R$ 5.330</p>
             <p className="mt-0.5 text-[10px] font-medium text-accent">+18,4%</p>
           </div>
         </div>

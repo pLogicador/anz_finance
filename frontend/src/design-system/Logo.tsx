@@ -29,7 +29,7 @@ export function Logo({ size = 28, className }: { size?: number; className?: stri
   return (
     <span className={`inline-flex items-center gap-2.5 ${className ?? ''}`}>
       <LogoMark size={size} />
-      <span className="text-base font-semibold tracking-tight text-neutral-50">ANZ Finance</span>
+      <span className="font-display text-base font-semibold tracking-tight text-neutral-50">ANZ Finance</span>
     </span>
   )
 }

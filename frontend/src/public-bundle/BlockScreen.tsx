@@ -18,7 +18,7 @@ export function BlockScreen({
         <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-neutral-800 text-2xl">
           {icon}
         </div>
-        <h1 className="text-xl font-semibold text-neutral-50">{title}</h1>
+        <h1 className="font-display text-xl font-semibold text-neutral-50">{title}</h1>
         <p className="mt-2 text-sm leading-relaxed text-neutral-400">{subtitle}</p>
         {action ? <div className="mt-6">{action}</div> : null}
       </div>
