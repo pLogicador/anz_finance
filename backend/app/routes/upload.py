@@ -57,7 +57,7 @@ async def upload_statements(
     settings: Settings = Depends(get_settings),
     store: WorkspaceStore = Depends(get_workspace_store),
 ) -> dict:
-    df, file_results = await parse_uploaded_ofx_files(files)
+    df, file_results, account_balances = await parse_uploaded_ofx_files(files)
 
     months: list[str] = []
     if not df.empty:
@@ -90,6 +90,9 @@ async def upload_statements(
     except (WorkSessionExpired, WorkSessionNotFound):
         store.create(session.workspace_id)
 
-    store.set_payload(session.workspace_id, WorkspacePayload(df=df, file_results=file_results, snapshots=carried_over_snapshots))
+    store.set_payload(
+        session.workspace_id,
+        WorkspacePayload(df=df, file_results=file_results, snapshots=carried_over_snapshots, account_balances=account_balances),
+    )
 
     return UploadResponse(files=file_results, total_transactions=int(len(df)), months=months).model_dump()

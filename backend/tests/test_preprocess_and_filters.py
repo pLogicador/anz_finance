@@ -19,10 +19,16 @@ def _raw_df() -> pd.DataFrame:
     )
 
 
-def test_preprocess_drops_id_and_derives_month() -> None:
+def test_preprocess_keeps_id_and_derives_month() -> None:
+    """Deliberate behavior change (2026-09-02, prompt-mestre "Maestro +
+    ANZ Finance" §13): the legacy port used to drop `ID` (FITID)
+    immediately -- it's kept now, since `app.pipeline.ofx_parser.
+    dedupe_transactions` needs it. This used to assert `"ID" not in
+    df.columns`; confirmed as a real gap, not a silent regression."""
     df = preprocess_df(_raw_df())
 
-    assert "ID" not in df.columns
+    assert "ID" in df.columns
+    assert df["ID"].tolist() == ["1", "2", "3"]
     assert df["Mês"].tolist() == ["2026-01", "2026-01", "2026-02"]
     assert all(isinstance(d, dt.date) and not isinstance(d, dt.datetime) for d in df["Data"])
 

@@ -28,6 +28,21 @@ class PeriodSummary:
 
 
 def summarize(df: pd.DataFrame) -> PeriodSummary:
+    """`round(..., 2)` em cada agregado (2026-09-02, prompt-mestre §12:
+    "Evite problemas de floating point... para cálculos monetários") --
+    somar dezenas/centenas de floats já arredondados a 2 casas pode
+    acumular ruído de representação binária (`sum([...]) ==
+    2760.0999999999999` em vez de `2760.1`, dependendo dos valores
+    envolvidos). Escopo deliberado: arredondar no limite de agregação
+    (aqui), não migrar o pipeline inteiro para `Decimal`/centavos inteiros
+    -- essa segunda opção é uma mudança de grande difusão (toca
+    `filters.py`/`csv_export.py`/`pdf_report.py` e todo teste que afirma
+    um valor float), com risco desproporcional ao ganho real observado
+    (checado empiricamente: `repr()` do Python já usa a representação mais
+    curta que arredonda de volta pro mesmo float, então a maioria dos
+    casos já aparece "limpa" sem nenhuma mudança -- o arredondamento aqui
+    é uma rede de segurança contra os casos-limite onde isso não basta).
+    """
     if df.empty:
         return PeriodSummary(0.0, 0.0, 0.0, 0, None, 0.0)
 
@@ -42,12 +57,12 @@ def summarize(df: pd.DataFrame) -> PeriodSummary:
         by_category = expenses.groupby("Categorias")["Valor"].sum().abs().sort_values(ascending=False)
         if not by_category.empty:
             top_category = by_category.index[0]
-            top_category_amount = float(by_category.iloc[0])
+            top_category_amount = round(float(by_category.iloc[0]), 2)
 
     return PeriodSummary(
-        income=float(income),
-        expense=float(expense),
-        net=float(net),
+        income=round(float(income), 2),
+        expense=round(float(expense), 2),
+        net=round(float(net), 2),
         transaction_count=int(len(df)),
         top_category=top_category,
         top_category_amount=top_category_amount,
@@ -82,9 +97,9 @@ def monthly_series(df: pd.DataFrame) -> pd.DataFrame:
     grouped = (
         df.groupby("Mês")["Valor"]
         .agg(
-            Receitas=lambda s: s[s > 0].sum(),
-            Despesas=lambda s: s[s < 0].sum(),
-            Saldo="sum",
+            Receitas=lambda s: round(s[s > 0].sum(), 2),
+            Despesas=lambda s: round(s[s < 0].sum(), 2),
+            Saldo=lambda s: round(s.sum(), 2),
         )
         .reset_index()
     )
@@ -95,5 +110,5 @@ def category_breakdown(df: pd.DataFrame, only_expenses: bool = True) -> pd.DataF
     subset = df[df["Valor"] < 0] if only_expenses else df
     if subset.empty:
         return pd.DataFrame(columns=["Categorias", "Valor"])
-    summary = subset.groupby("Categorias")["Valor"].sum().abs().reset_index()
+    summary = subset.groupby("Categorias")["Valor"].sum().abs().round(2).reset_index()
     return summary[summary["Valor"] > 0].sort_values("Valor", ascending=False)

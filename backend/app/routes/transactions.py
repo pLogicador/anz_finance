@@ -13,6 +13,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 
 from app.pipeline import metrics
+from app.pipeline.balance import validate_balance
 from app.pipeline.filters import apply_type_filter, filter_transactions, filter_transactions_for_trend
 from app.pipeline.serialization import df_to_records
 from app.workspace.deps import get_workspace_payload
@@ -119,4 +120,30 @@ def get_summary(
         "deltas": {"income": income_delta, "expense": expense_delta, "net": net_delta},
         "monthly_series": monthly.to_dict(orient="records"),
         "category_breakdown": breakdown.to_dict(orient="records"),
+    }
+
+
+@router.get("/balance-validation")
+def get_balance_validation(payload: WorkspacePayload = Depends(get_workspace_payload)) -> dict:
+    """Prompt-mestre "Maestro + ANZ Finance" §17 -- deterministic check of
+    SUM(transactions) against each account's reported LEDGERBAL, when the
+    uploaded OFX included one. Deliberately operates on the FULL,
+    unfiltered history (`payload.df`), not the current month/category/type
+    selection -- a reported balance reflects the whole account, not
+    whatever the dashboard happens to be filtered to right now.
+    """
+    checks = validate_balance(payload.df, payload.account_balances)
+    return {
+        "checks": [
+            {
+                "account": c.account,
+                "reported_balance": c.reported_balance,
+                "computed_balance": c.computed_balance,
+                "difference": c.difference,
+                "matches": c.matches,
+                "source_filename": c.source_filename,
+                "assumption": c.assumption,
+            }
+            for c in checks
+        ]
     }

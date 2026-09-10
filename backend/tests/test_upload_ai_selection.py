@@ -38,6 +38,24 @@ def _upload(client: TestClient, headers: dict, data: dict | None = None):
         )
 
 
+def _upload_unclassifiable(client: TestClient, headers: dict, data: dict | None = None):
+    """Mesmo helper de `_upload`, mas com um fixture cuja única transação
+    (2026-09-02, achado real -- prompt-mestre §14) NÃO bate com nenhuma
+    regra determinística de app/pipeline/categorizer/rules.py -- as 3
+    descrições de `valid_statement.ofx` (SUPERMERCADO ABC/SALARIO EMPRESA
+    XYZ/CONTA DE LUZ) passaram a ser resolvidas 100% por regra, então o
+    provedor de IA nunca era mais chamado durante o upload -- quebrando os
+    2 testes deste arquivo que existem justamente pra verificar QUAL
+    provedor/chave é usado quando a classificação por IA de fato acontece."""
+    with open(FIXTURES / "statement_with_unclassifiable_description.ofx", "rb") as fh:
+        return client.post(
+            "/workspace/upload",
+            headers=headers,
+            data=data or {},
+            files={"files": ("statement_with_unclassifiable_description.ofx", fh, "application/octet-stream")},
+        )
+
+
 @respx.mock
 def test_upload_with_no_key_configured_anywhere_still_succeeds_with_degraded_classification(client: TestClient, test_settings) -> None:
     from app.core.config import get_settings
@@ -65,7 +83,7 @@ def test_upload_routes_to_openai_when_provider_is_selected(client: TestClient) -
     headers = _bridge_and_get_headers(client)
     route = respx.post(OPENAI_CHAT_COMPLETIONS_URL).mock(return_value=httpx.Response(200, json={"choices": [{"message": {"content": "Mercado"}}]}))
 
-    response = _upload(client, headers, {"provider": "openai", "model": "gpt-4o"})
+    response = _upload_unclassifiable(client, headers, {"provider": "openai", "model": "gpt-4o"})
 
     assert response.status_code == 200
     assert route.called
@@ -76,7 +94,7 @@ def test_upload_uses_the_users_own_key_when_supplied(client: TestClient) -> None
     headers = _bridge_and_get_headers(client)
     route = respx.post(GROQ_CHAT_COMPLETIONS_URL).mock(return_value=httpx.Response(200, json={"choices": [{"message": {"content": "Mercado"}}]}))
 
-    _upload(client, headers, {"provider": "groq", "api_key": "user-own-key-upload"})
+    _upload_unclassifiable(client, headers, {"provider": "groq", "api_key": "user-own-key-upload"})
 
     assert route.calls.last.request.headers["Authorization"] == "Bearer user-own-key-upload"
 

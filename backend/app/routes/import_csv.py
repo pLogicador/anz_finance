@@ -19,7 +19,7 @@ from app.pipeline.categorizer.registry import DEFAULT_PROVIDER, UnknownProvider,
 from app.pipeline.categorizer.service import classify_transactions
 from app.pipeline.csv_import import CsvImportError, apply_column_mapping, preview_csv
 from app.pipeline.limits import MAX_UPLOAD_FILE_BYTES
-from app.pipeline.ofx_parser import FileParseResult
+from app.pipeline.ofx_parser import FileParseResult, dedupe_transactions
 from app.pipeline.preprocess import preprocess_df
 from app.workspace.models import WorkspacePayload
 from app.workspace.store import WorkSessionExpired, WorkSessionNotFound, WorkspaceStore, get_workspace_store
@@ -87,14 +87,26 @@ async def commit(
     file_results = list(existing_payload.file_results) if existing_payload is not None else []
     file_results.append(FileParseResult(filename=file.filename or "import.csv", status="ok", rows_parsed=int(len(new_df))))
     carried_over_snapshots = existing_payload.snapshots if existing_payload is not None else []
+    # CSV import never carries its own reported balance -- keep whatever
+    # OFX statement(s) already contributed, if any (see app.pipeline.balance).
+    carried_over_balances = existing_payload.account_balances if existing_payload is not None else []
 
     combined_df = pd.concat([base_df, new_df], ignore_index=True) if not base_df.empty else new_df
+    # CSV import is the other real duplication path found in the audit
+    # (§13): re-importing a CSV whose rows already exist (via OFX or a
+    # previous CSV import) should not double-count them.
+    combined_df = dedupe_transactions(combined_df)
 
     try:
         store.touch(session.workspace_id)
     except (WorkSessionExpired, WorkSessionNotFound):
         store.create(session.workspace_id)
-    store.set_payload(session.workspace_id, WorkspacePayload(df=combined_df, file_results=file_results, snapshots=carried_over_snapshots))
+    store.set_payload(
+        session.workspace_id,
+        WorkspacePayload(
+            df=combined_df, file_results=file_results, snapshots=carried_over_snapshots, account_balances=carried_over_balances
+        ),
+    )
 
     months = sorted(combined_df["Mês"].unique().tolist(), reverse=True) if not combined_df.empty else []
     return {"total_transactions": int(len(combined_df)), "imported_rows": int(len(new_df)), "months": months}

@@ -218,6 +218,157 @@ palette/onboarding revisados, escala tipográfica formal com tokens de
 espaçamento nomeados (hoje só cor/radius têm tokens formais, tipografia
 ganhou só a face, não uma escala completa de tamanhos/pesos nomeados).
 
+## Fase 15 — Deduplicação por FITID + validação de saldo (backend, prompt-mestre "Maestro + ANZ Finance")
+
+Foco B do prompt-mestre `03-maestro-anzfinance-auditoria-prompt-mestre.md`
+(registrado em `hub/react-app/.claude/project-context/prompts/`). O
+dashboard já era 100% determinístico e auditado (Fase 9) — não precisou
+de mudança. Dois gaps reais e concretos, confirmados lendo o código antes
+de qualquer alteração (não presumidos a partir do prompt):
+
+**1. Deduplicação (§13).** `preprocess.py` descartava a coluna `ID`
+(FITID) logo após o parse, e o teste existente afirmava explicitamente
+"no cross-file dedup" como comportamento correto — confirmado, ao testar
+de propósito, que enviar o mesmo extrato duas vezes duplicava
+integralmente as transações. Corrigido: `ofx_parser.py::
+_extract_transactions` passou a capturar também `Tipo` (TRNTYPE) e
+`Conta` (ACCTID) — os 3 campos que a chave composta do prompt pede além
+de data/valor/descrição — confirmados presentes na biblioteca `ofxparse`
+instalada (lidos diretamente no código-fonte dela, não assumidos). Nova
+`dedupe_transactions()` (mesmo módulo): FITID quando presente e
+não-vazio, senão a chave composta. Aplicada nos 2 pontos reais de
+duplicação encontrados: dentro de `parse_uploaded_ofx_files` (upload
+multi-arquivo com sobreposição) e em `import_csv.py`'s passo de
+**anexar** ao workspace já existente (o outro caminho real, documentado
+desde a Fase 7). `preprocess.py` parou de descartar `ID` (precisa dele
+pra dedupe funcionar). O teste que afirmava "6 linhas, sem dedup" foi
+**atualizado deliberadamente** para "3 linhas, deduplicado" — mudança de
+comportamento documentada, não uma regressão silenciosa — e outro teste
+em `test_preprocess_and_filters.py` que também afirmava "ID descartado"
+precisou do mesmo ajuste (achado durante a validação, não previsto de
+início). Novo teste dedicado de "importação duplicada"
+(`test_duplicate_import_is_deduplicated_by_fitid`).
+
+**2. Validação de saldo (§17).** `LEDGERBAL`/`AVAILBAL` nunca eram
+extraídos (confirmado: zero uso em todo `backend/`) — apesar da fixture
+de teste já existente (`valid_statement.ofx`) já ter um `<LEDGERBAL>`
+real (2760.10, que bate exatamente com a soma das 3 transações da
+fixture — só não era usado em lugar nenhum). Nova `_extract_account_balances`
+em `ofx_parser.py` (usa `statement.balance`/`.available_balance`,
+confirmados como atributos definidos dinamicamente pela lib só quando o
+arquivo OFX de fato inclui um `<LEDGERBAL>`/`<AVAILBAL>` — nem todo
+arquivo inclui). Novo módulo `app/pipeline/balance.py::validate_balance`
+(determinístico, mesmo racional de `metrics.py`/`insights.py`/
+`analysis.py`) com tolerância de 1 centavo (não especificada pelo
+prompt — decisão de implementação pra absorver arredondamento de
+float). **Limitação real, documentada em vez de escondida** (o próprio
+"não esconder o problema" do prompt aplicado à limitação do próprio
+cálculo, não só a um número que não bate): `ofxparse` não expõe saldo de
+*abertura*, só o `LEDGERBAL` (ponto no tempo) — o cálculo real feito aqui
+é `SOMA(todas as transações da conta enviadas nesta sessão)` vs. o
+LEDGERBAL mais recente, que só é uma reconciliação exata se os extratos
+enviados cobrirem o histórico completo da conta desde a abertura (saldo
+zero). Quando isso não vale (o caso mais comum — só um mês foi enviado),
+uma divergência é esperada e não significa necessariamente um problema
+nos dados — por isso `AccountBalanceCheck` sempre carrega um campo
+`assumption` com essa ressalva, tanto em uso interno quanto na resposta
+da nova rota `GET /workspace/balance-validation` (opera sobre o histórico
+completo do workspace, não a seleção de mês/categoria/tipo atual — um
+saldo informado descreve a conta inteira, não o que o dashboard tem
+filtrado agora). `WorkspacePayload` ganhou `account_balances` (substituído
+a cada novo upload de OFX, carregado adiante em importações de CSV, que
+nunca trazem saldo próprio). Testes novos em `tests/test_balance.py`
+(unidade + integração ponta a ponta via bridge real).
+
+**Registrado, não implementado nesta rodada** (maior/mais arriscado,
+mesmo racional de escopo das fases anteriores): refatoração de `float`
+para `Decimal` em todo o pipeline monetário (§12 — toca `metrics.py`/
+`filters.py`/`csv_export.py`/`pdf_report.py` e todo teste que afirma
+valor float, mudança de grande difusão, própria rodada dedicada);
+classificador baseado em regras antes do LLM (§14 — exige desenho de
+taxonomia de regras, decisão de produto); cobertura completa de campos
+adicionais do OFX (`BANKID`/`CHECKNUM`/`REFNUM` além do que dedup/saldo
+já exigiram).
+
+**Validado**: 173/173 pytest passando (up de 166) — incluindo os 2 testes
+pré-existentes atualizados deliberadamente e os 7 novos. Nenhuma mudança
+no frontend foi necessária (o novo endpoint e o novo campo em
+`WorkspacePayload` são puramente aditivos, nenhum contrato de API
+existente mudou).
+
+## Fase 16 — Classificador de regras, campos OFX adicionais, arredondamento monetário (2026-09-02)
+
+Fecha os 3 itens registrados como "não implementado" no fim da Fase 15.
+
+**Classificador de regras antes do LLM — implementado (§14).** Achado
+real: `classify_transactions` (`app/pipeline/categorizer/service.py`)
+mandava TODA descrição pro provedor de IA configurado, mesmo padrões
+óbvios ("UBER", "IFOOD", "ALUGUEL"). Novo
+`app/pipeline/categorizer/rules.py::classify_by_rules` — palavras-chave
+conservadoras (evitar falso-positivo é mais importante que cobrir 100%
+dos casos) pras 11 categorias oficiais (`labels.VALID_CATEGORIES`, nenhuma
+taxonomia nova inventada), normalizando acento/caixa/pontuação (achado
+real durante a validação: descrições de cartão vêm com códigos de
+processadora entre as palavras — `"UBER   *TRIP HELP.UBER.COM"` — que
+quebravam um match ingênuo por substring exata).
+`classify_transactions` agora roda as regras primeiro; só o que sobrar
+(retornou `None`) vai ao provedor de IA — quando TODAS as descrições
+batem com regra, zero chamada de LLM acontece (confirmado por teste
+dedicado). Assinatura da função preservada, os 2 call sites existentes
+(`routes/upload.py`/`routes/import_csv.py`) não precisaram mudar.
+
+**4 testes pré-existentes precisaram de ajuste deliberado, não
+regressão silenciosa**: `test_workspace_api.py`/`test_ai_routes.py`/
+`test_upload_ai_selection.py` mockavam o provedor de IA assumindo que
+TODA descrição do fixture chegaria até ele — com as regras resolvendo
+2-3 das 3 descrições do fixture padrão, os mocks baseados em posição
+(`side_effect=[...]`) ficavam dessincronizados. Corrigido caso a caso:
+2 testes de `test_upload_ai_selection.py` (cujo propósito real é testar
+roteamento de provedor/chave, não classificação) passaram a usar um
+novo fixture (`statement_with_unclassifiable_description.ofx`) com uma
+descrição deliberadamente ambígua, garantindo que a chamada ao provedor
+ainda acontece; os demais passaram a bater exatamente com o resultado
+esperado original assim que a regra "salario" (ampliada de 2 frases
+específicas pra 1 palavra-chave genérica, mudança de qualidade real, não
+só pra satisfazer teste) resolveu a 3ª descrição do fixture do mesmo
+jeito que o mock antigo já esperava.
+
+**Campos OFX adicionais — implementado, com uma exceção documentada
+(§11).** `ofx_parser.py::_extract_transactions` ganhou 3 colunas
+aditivas: `Beneficiário` (NAME/`transaction.payee`), `NúmeroCheque`
+(CHECKNUM/`transaction.checknum`), `BancoID` (BANKID/
+`account.routing_number`) — confirmados presentes no `ofxparse`
+instalado lendo o código-fonte da lib diretamente (mesma disciplina já
+usada pra FITID/TRNTYPE/ACCTID na Fase 15). **REFNUM não é capturado**:
+confirmado por leitura completa do `ofxparse.py` instalado que a lib
+nunca faz `.find('refnum')` em lugar nenhum — diferente de
+`checknum`/`bankid`, que ela de fato parseia. Implementar exigiria
+bypassar a lib e re-percorrer a árvore SGML/XML crua, um custo/risco
+desproporcional pra um campo que extratos OFX brasileiros essencialmente
+nunca populam. Colunas puramente aditivas — `EXPORT_COLUMNS`
+(`preprocess.py`) já filtra explicitamente antes do CSV export, então
+nada vaza sem intenção.
+
+**Arredondamento monetário — fix cirúrgico aplicado, migração completa
+pra `Decimal` continua fora de escopo (§12/§16).** Checado
+empiricamente: `sum()` de floats já-arredondados-a-2-casas raramente
+produz ruído visível em Python 3 (o `repr()` já usa a representação mais
+curta que arredonda de volta pro mesmo float) — mas pode acontecer em
+casos-limite com volumes maiores. `round(..., 2)` aplicado nos 3 pontos
+de agregação de `app/pipeline/metrics.py` (`summarize`/`monthly_series`/
+`category_breakdown`) como rede de segurança barata e de baixo risco,
+sem migrar o pipeline inteiro pra `Decimal`/centavos inteiros — essa
+segunda opção continua sendo uma mudança de grande difusão (tocaria
+`filters.py`/`csv_export.py`/`pdf_report.py` e todo teste que afirma um
+valor float), desproporcional ao ganho real observado.
+
+**Testes**: `tests/test_categorizer_rules.py` (novo, 20 testes:
+12 padrões reconhecidos + 5 descrições ambíguas corretamente ignoradas +
+3 sobre o merge regra→LLM), `tests/test_ofx_parser.py` (+1, novo fixture
+`statement_with_name_checknum.ofx`), `tests/test_upload_ai_selection.py`
+(2 testes redirecionados pro fixture ambíguo, mesmo propósito original
+preservado). **194/194 pytest passando** (up de 173).
+
 ## Running locally, testing, deploy
 
 See `docs/` (added in Fase 10) for the up-to-date, reader-facing versions of this: `docs/RUNNING_LOCALLY.md` (backend/frontend/mock-Syncron/tests), `docs/ARCHITECTURE.md` (how the system works), `docs/DEPLOY.md` (Railway backend + Vercel frontend runbook). This CLAUDE.md file stays the phase-by-phase session log; `docs/` is the operator-facing manual.

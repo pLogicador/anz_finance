@@ -171,7 +171,15 @@ def test_ask_grounds_the_prompt_in_the_real_session_numbers(client: TestClient) 
     verbatim, proving the assistant is grounded in this session's real data
     and not just forwarding the bare question."""
     headers = _bridge_and_get_headers(client)
-    route = _mock_groq_classify_then(["Mercado", "Receitas", "Moradia"], then_returns="Você recebeu R$ 3000,00 em janeiro.")
+    # 2026-09-02: as 3 descrições do fixture (SUPERMERCADO ABC/SALARIO
+    # EMPRESA XYZ/CONTA DE LUZ) agora são todas resolvidas por regra
+    # determinística (app/pipeline/categorizer/rules.py, prompt-mestre
+    # §14) -- zero chamada real de classificação acontece no upload, então
+    # a 1ª (e única) chamada HTTP real ao "Groq" é a própria pergunta do
+    # /ai/ask. `categories=[]` deixa isso explícito (antes, uma lista de 3
+    # itens desalinhava o índice do side_effect e a resposta da pergunta
+    # "roubava" a resposta que seria da 1ª classificação).
+    route = _mock_groq_classify_then([], then_returns="Você recebeu R$ 3000,00 em janeiro.")
     _upload_valid_statement(client, headers)
 
     response = client.post("/ai/ask", headers=headers, json={"question": "quanto recebi em janeiro?", "month": "2026-01"})

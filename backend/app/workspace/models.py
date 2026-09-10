@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
-from app.pipeline.ofx_parser import FileParseResult
+from app.pipeline.ofx_parser import AccountBalance, FileParseResult
 
 
 @dataclass
@@ -28,3 +28,6 @@ class WorkspacePayload:
     df: pd.DataFrame
     file_results: list[FileParseResult]
     snapshots: list[Snapshot] = field(default_factory=list)
+    # Saldo informado (LEDGERBAL) por conta, quando o OFX incluiu -- usado
+    # por app.pipeline.balance.validate_balance (§17 do prompt-mestre).
+    account_balances: list[AccountBalance] = field(default_factory=list)
