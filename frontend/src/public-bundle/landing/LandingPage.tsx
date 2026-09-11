@@ -266,10 +266,56 @@ function FinalCta() {
   )
 }
 
+// Rodapé padronizado com o Hub (mesma estrutura/lógica de navegação já
+// aplicada no Live Scheduler/FlexiPage/AgenteOS) -- era um parágrafo de
+// texto sem link nenhum.
 function Footer() {
   return (
-    <footer className="border-t border-surface-border/60 px-5 py-8 text-center text-xs text-neutral-600 sm:px-8">
-      <p>ANZ Finance é um serviço do ecossistema Syncron.</p>
+    <footer className="border-t border-surface-border/60 px-5 py-8 sm:px-8">
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 md:flex-row md:justify-between">
+        <div className="max-w-xs">
+          <p className="font-display text-sm font-semibold text-neutral-50">ANZ Finance</p>
+          <p className="mt-2 text-xs text-neutral-500">
+            Controle financeiro completo -- parte do ecossistema Syncron.
+          </p>
+        </div>
+
+        <div className="flex gap-10 text-xs">
+          <div className="flex flex-col gap-2">
+            <span className="font-semibold uppercase tracking-wide text-neutral-600">Ecossistema</span>
+            <a href={env.syncronHubUrl} className="text-neutral-400 transition-colors hover:text-neutral-50">
+              Acessar o Hub
+            </a>
+            <a
+              href={`${env.syncronHubUrl}/app/services/`}
+              className="text-neutral-400 transition-colors hover:text-neutral-50"
+            >
+              Minhas ferramentas
+            </a>
+          </div>
+          <div className="flex flex-col gap-2">
+            <span className="font-semibold uppercase tracking-wide text-neutral-600">Suporte</span>
+            <a
+              href="mailto:pedrologicador@gmail.com"
+              className="text-neutral-400 transition-colors hover:text-neutral-50"
+            >
+              Falar com suporte
+            </a>
+            <a
+              href={`${env.syncronHubUrl}/legal/privacy/`}
+              className="text-neutral-400 transition-colors hover:text-neutral-50"
+            >
+              Privacidade
+            </a>
+            <a
+              href={`${env.syncronHubUrl}/legal/terms/`}
+              className="text-neutral-400 transition-colors hover:text-neutral-50"
+            >
+              Termos de Uso
+            </a>
+          </div>
+        </div>
+      </div>
     </footer>
   )
 }

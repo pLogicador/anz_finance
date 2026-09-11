@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 
 import { useSessionStore } from '@/auth/session-store'
 import { LogoMark } from '@/design-system/Logo'
+import { env } from '@/lib/env'
 
 import { AiInsights } from './ai/AiInsights'
 import { GlobalSearch } from './analysis/GlobalSearch'
@@ -409,6 +410,58 @@ export default function DashboardPage() {
           </Suspense>
         )
       ) : null}
+
+      {/* Rodapé padronizado com o Hub (mesma estrutura/lógica de navegação já
+          aplicada no Live Scheduler/FlexiPage/AgenteOS/landing do ANZ Finance)
+          -- fora do gate de presentationMode (chrome de navegação, não faz
+          sentido esconder junto com abas/filtros) mas com print:hidden, já
+          que não tem lugar num export em PDF. */}
+      <footer className="border-t border-surface-border/60 pt-6 print:hidden">
+        <div className="flex flex-col gap-6 md:flex-row md:justify-between">
+          <div className="max-w-xs">
+            <p className="font-display text-sm font-semibold text-neutral-50">ANZ Finance</p>
+            <p className="mt-2 text-xs text-neutral-500">
+              Controle financeiro completo -- parte do ecossistema Syncron.
+            </p>
+          </div>
+
+          <div className="flex gap-10 text-xs">
+            <div className="flex flex-col gap-2">
+              <span className="font-semibold uppercase tracking-wide text-neutral-600">Ecossistema</span>
+              <a href={env.syncronHubUrl} className="text-neutral-400 transition-colors hover:text-neutral-50">
+                Acessar o Hub
+              </a>
+              <a
+                href={`${env.syncronHubUrl}/app/services/`}
+                className="text-neutral-400 transition-colors hover:text-neutral-50"
+              >
+                Minhas ferramentas
+              </a>
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="font-semibold uppercase tracking-wide text-neutral-600">Suporte</span>
+              <a
+                href="mailto:pedrologicador@gmail.com"
+                className="text-neutral-400 transition-colors hover:text-neutral-50"
+              >
+                Falar com suporte
+              </a>
+              <a
+                href={`${env.syncronHubUrl}/legal/privacy/`}
+                className="text-neutral-400 transition-colors hover:text-neutral-50"
+              >
+                Privacidade
+              </a>
+              <a
+                href={`${env.syncronHubUrl}/legal/terms/`}
+                className="text-neutral-400 transition-colors hover:text-neutral-50"
+              >
+                Termos de Uso
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
