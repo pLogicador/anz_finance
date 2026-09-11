@@ -313,6 +313,12 @@ function Footer() {
             >
               Termos de Uso
             </a>
+            <a
+              href={`${env.syncronHubUrl}/legal/cookies/`}
+              className="text-neutral-400 transition-colors hover:text-neutral-50"
+            >
+              Cookies
+            </a>
           </div>
         </div>
       </div>
