@@ -27,8 +27,8 @@ describe('formatCurrency', () => {
 })
 
 describe('formatPercent', () => {
-  it('returns an em dash for null (no baseline to compare against)', () => {
-    expect(formatPercent(null)).toBe('—')
+  it('returns a hyphen placeholder for null (no baseline to compare against)', () => {
+    expect(formatPercent(null)).toBe('-')
   })
 
   it('prefixes a positive delta with +', () => {

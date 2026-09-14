@@ -14,7 +14,7 @@ export function PlanExpiredScreen() {
     <BlockScreen
       icon="⏳"
       title="Seu plano Syncron expirou"
-      subtitle="O acesso ao ANZ Finance depende de um plano ativo na Syncron. Renove seu plano no Syncron Hub para voltar a usar o painel."
+      subtitle="O acesso ao ANZ Finance depende de um plano ativo na Syncron. Renove seu plano no Syncron para voltar a usar o painel."
       action={
         <a
           href={`${env.syncronHubUrl}/company/planos.html`}

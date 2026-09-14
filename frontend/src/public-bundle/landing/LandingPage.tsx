@@ -284,7 +284,7 @@ function Footer() {
           <div className="flex flex-col gap-2">
             <span className="font-semibold uppercase tracking-wide text-neutral-600">Ecossistema</span>
             <a href={env.syncronHubUrl} className="text-neutral-400 transition-colors hover:text-neutral-50">
-              Acessar o Hub
+              Acessar o Syncron
             </a>
             <a
               href={`${env.syncronHubUrl}/app/services/`}

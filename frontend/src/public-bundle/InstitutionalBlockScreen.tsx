@@ -16,14 +16,14 @@ export function InstitutionalBlockScreen() {
   return (
     <BlockScreen
       icon="🔒"
-      title="Acesso pelo Syncron Hub"
-      subtitle="O ANZ Finance é um serviço do ecossistema Syncron. Acesse pelo Syncron Hub para continuar."
+      title="Acesso pelo Syncron"
+      subtitle="O ANZ Finance é um serviço do ecossistema Syncron. Acesse pelo Syncron para continuar."
       action={
         <a
           href={env.syncronHubUrl}
           className="inline-flex w-full items-center justify-center rounded-lg bg-neutral-50 px-4 py-2.5 text-sm font-medium text-neutral-900 transition hover:bg-neutral-200"
         >
-          Ir para o Syncron Hub
+          Ir para o Syncron
         </a>
       }
     />

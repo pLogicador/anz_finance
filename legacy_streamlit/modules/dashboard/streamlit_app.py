@@ -173,7 +173,7 @@ def _render_kpis(period_df, trend_df, selected_month: str) -> None:
     # "expense" totals are negative sums; flip so positive delta = spent more.
     expense_delta = None if expense_delta_raw is None else -expense_delta_raw
 
-    top_category_value = summary.top_category or "—"
+    top_category_value = summary.top_category or "-"
     top_category_footnote = (
         format_currency(summary.top_category_amount) if summary.top_category else "Sem gastos no período"
     )

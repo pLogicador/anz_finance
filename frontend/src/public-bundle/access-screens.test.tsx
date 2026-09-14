@@ -31,8 +31,8 @@ describe('access-state screens are visibly distinct from each other', () => {
 
   it('InstitutionalBlockScreen (token invalid/missing) links back to the Hub, not to a plan page', () => {
     render(<InstitutionalBlockScreen />)
-    expect(screen.getByText('Acesso pelo Syncron Hub')).toBeInTheDocument()
-    const link = screen.getByRole('link', { name: /Ir para o Syncron Hub/i })
+    expect(screen.getByText('Acesso pelo Syncron')).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: /Ir para o Syncron/i })
     expect(link).toHaveAttribute('href', expect.not.stringContaining('/planos'))
   })
 
