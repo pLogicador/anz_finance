@@ -6,7 +6,10 @@ one request and never logged, stored, or echoed back.
 
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from app.access.deps import get_current_session
 from app.access.security import SessionClaims
@@ -99,12 +102,11 @@ GROUNDING_SYSTEM_PROMPT = (
 )
 
 
-@router.post("/ask")
-async def ask(
-    body: AiAskRequest,
-    settings: Settings = Depends(get_settings),
-    payload: WorkspacePayload = Depends(get_workspace_payload),
-) -> dict:
+def _ground(body: AiAskRequest, settings: Settings, payload: WorkspacePayload):
+    """Monta o contexto real da sessão + resolve o provedor -- exatamente o
+    mesmo trabalho preparatório de `ask()` e `ask_stream()` (Fase 4), fatorado
+    pra não duplicar (e não arriscar as duas rotas divergindo silenciosamente
+    em qual dado real chega ao modelo)."""
     period_df = apply_type_filter(filter_transactions(payload.df, body.month, body.categories), body.type)
     trend_df = apply_type_filter(filter_transactions_for_trend(payload.df, body.categories), body.type)
 
@@ -119,11 +121,68 @@ async def ask(
 
     context = _build_grounding_context(summary=summary, deltas=deltas, breakdown=breakdown, monthly=monthly, month=body.month)
     provider = _build_provider_or_400(body.provider, body.model, body.api_key, settings)
-
     user_prompt = f"Dados da sessão atual:\n{context}\n\nPergunta do usuário: {body.question}"
+    return provider, user_prompt
+
+
+@router.post("/ask")
+async def ask(
+    body: AiAskRequest,
+    settings: Settings = Depends(get_settings),
+    payload: WorkspacePayload = Depends(get_workspace_payload),
+) -> dict:
+    provider, user_prompt = _ground(body, settings, payload)
     try:
         answer = await provider.complete(system=GROUNDING_SYSTEM_PROMPT, user=user_prompt)
     except Exception as exc:  # noqa: BLE001 -- provider-specific exceptions, never surfaced raw
         raise HTTPException(status_code=502, detail={"message": "O provedor de IA não respondeu. Tente novamente em instantes."}) from exc
 
     return {"answer": answer}
+
+
+@router.post("/ask/stream")
+async def ask_stream(
+    body: AiAskRequest,
+    settings: Settings = Depends(get_settings),
+    payload: WorkspacePayload = Depends(get_workspace_payload),
+) -> StreamingResponse:
+    """Fase 4 do plano de streaming real (2026-09-15, syncron_core/docs/
+    maestro-respostas-reais-streaming-plano.md) -- mesmo grounding/mesma
+    validação de `ask()` (um provedor/chave inválidos ainda viram 400 ANTES
+    de qualquer byte do stream sair, já que `_ground` roda fora do gerador
+    SSE), só que a resposta chega em deltas reais (SSE nativo do provedor)
+    em vez de esperar o texto inteiro. Mesmo formato de evento já usado por
+    `syncron_core/app/api/v1/executions.py::stream_execution` (nomeado,
+    `event: <nome>\\ndata: <json>\\n\\n`), pra qualquer cliente SSE genérico
+    já saber lidar com os dois.
+
+    Uma falha do provedor DEPOIS de já ter começado a mandar deltas não pode
+    mais virar um HTTP 502 normal (os headers/200 já foram enviados) --
+    vira um evento `error` nomeado, e quem já recebeu texto parcial decide o
+    que fazer com ele (mesmo racional do 'partial' terminal do syncron_core)."""
+    provider, user_prompt = _ground(body, settings, payload)
+
+    async def event_source():
+        try:
+            async for delta in provider.stream(system=GROUNDING_SYSTEM_PROMPT, user=user_prompt):
+                yield f"event: delta\ndata: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"
+        except Exception:  # noqa: BLE001 -- provider-specific exceptions, never surfaced raw
+            error_payload = json.dumps(
+                {"message": "O provedor de IA não respondeu. Tente novamente em instantes."}, ensure_ascii=False
+            )
+            yield f"event: error\ndata: {error_payload}\n\n"
+            return
+        yield "event: done\ndata: {}\n\n"
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            # Mesmo achado do syncron_core (proxies tipo nginx/Render
+            # bufferizam por padrão, segurando os eventos até fechar a
+            # conexão inteira -- inutiliza o streaming inteiro sem isto).
+            "X-Accel-Buffering": "no",
+        },
+    )

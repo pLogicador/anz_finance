@@ -23,6 +23,8 @@ instead of swallowing it, since there's no batch to keep alive.
 from __future__ import annotations
 
 import asyncio
+import json
+from typing import AsyncIterator
 
 import httpx
 
@@ -83,6 +85,46 @@ class GroqProvider:
             async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
                 return (await self._chat(client, user, system=system)).strip()
         except Exception as exc:  # noqa: BLE001
+            raise GroqProviderError(str(exc)) from exc
+
+    async def stream(self, *, system: str, user: str) -> AsyncIterator[str]:
+        """Fase 4 do plano de streaming real -- mesmo endpoint/auth de
+        ``_chat`` só com `stream: true`, consumindo o SSE nativo da própria
+        Groq (o formato Chat Completions padrão: `data: {...}\\n\\n` por
+        chunk, terminado por `data: [DONE]\\n\\n`) em vez de esperar o corpo
+        inteiro. Levanta em qualquer falha, inclusive uma que só aparece NO
+        MEIO da iteração (conexão cai depois de já ter mandado alguns
+        deltas) -- mesmo contrato de `complete()`, o chamador decide o que
+        fazer com o texto parcial já recebido até ali."""
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+                async with client.stream(
+                    "POST",
+                    GROQ_CHAT_COMPLETIONS_URL,
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    json={"model": self.model, "messages": messages, "temperature": 0, "stream": True},
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line or not line.startswith("data:"):
+                            continue
+                        raw = line[len("data:") :].strip()
+                        if raw == "[DONE]":
+                            return
+                        try:
+                            chunk = json.loads(raw)
+                        except ValueError:
+                            continue
+                        choices = chunk.get("choices") or []
+                        delta = (choices[0].get("delta") or {}).get("content") if choices else None
+                        if delta:
+                            yield delta
+        except httpx.HTTPStatusError as exc:
+            raise GroqProviderError(f"Groq respondeu {exc.response.status_code}") from exc
+        except httpx.TimeoutException as exc:
+            raise GroqProviderError("Groq não respondeu a tempo") from exc
+        except httpx.TransportError as exc:
             raise GroqProviderError(str(exc)) from exc
 
     async def test_connection(self) -> bool:

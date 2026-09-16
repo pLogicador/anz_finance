@@ -9,6 +9,8 @@ almost no new code, rather than a placeholder/fake provider standing in for
 from __future__ import annotations
 
 import asyncio
+import json
+from typing import AsyncIterator
 
 import httpx
 
@@ -69,6 +71,41 @@ class OpenAIProvider:
             async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
                 return (await self._chat(client, user, system=system)).strip()
         except Exception as exc:  # noqa: BLE001
+            raise OpenAIProviderError(str(exc)) from exc
+
+    async def stream(self, *, system: str, user: str) -> AsyncIterator[str]:
+        """Fase 4 do plano de streaming real -- mesmo racional/contrato do
+        GroqProvider.stream (as duas APIs são compatíveis no formato de
+        Chat Completions, incluindo o shape do SSE)."""
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+                async with client.stream(
+                    "POST",
+                    OPENAI_CHAT_COMPLETIONS_URL,
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    json={"model": self.model, "messages": messages, "temperature": 0, "stream": True},
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line or not line.startswith("data:"):
+                            continue
+                        raw = line[len("data:") :].strip()
+                        if raw == "[DONE]":
+                            return
+                        try:
+                            chunk = json.loads(raw)
+                        except ValueError:
+                            continue
+                        choices = chunk.get("choices") or []
+                        delta = (choices[0].get("delta") or {}).get("content") if choices else None
+                        if delta:
+                            yield delta
+        except httpx.HTTPStatusError as exc:
+            raise OpenAIProviderError(f"OpenAI respondeu {exc.response.status_code}") from exc
+        except httpx.TimeoutException as exc:
+            raise OpenAIProviderError("OpenAI não respondeu a tempo") from exc
+        except httpx.TransportError as exc:
             raise OpenAIProviderError(str(exc)) from exc
 
     async def test_connection(self) -> bool:
