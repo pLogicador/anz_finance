@@ -21,8 +21,10 @@ OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions"
 DEFAULT_CONCURRENCY = 8
 DEFAULT_TIMEOUT_SECONDS = 20.0
 # Ver o mesmo comentário em groq_provider.py -- Q&A livre (complete/stream)
-# precisa de mais fôlego que classificar uma única transação.
-QA_TIMEOUT_SECONDS = 45.0
+# precisa de mais fôlego que classificar uma única transação. Dobrado de
+# 45s pra 90s em 2026-09-18 (usuário confirmou ao vivo que 45s ainda
+# cortava um relatório mais longo sobre "Todos os meses").
+QA_TIMEOUT_SECONDS = 90.0
 
 
 class OpenAIProviderError(Exception):

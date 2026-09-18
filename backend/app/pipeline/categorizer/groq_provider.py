@@ -34,16 +34,21 @@ DEFAULT_MODEL = "llama-3.1-8b-instant"
 GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
 DEFAULT_CONCURRENCY = 8
 DEFAULT_TIMEOUT_SECONDS = 20.0
-# Achado real (2026-09-17, "provedor de IA não respondeu" no Maestro):
+# Achado real (2026-09-17/18, "provedor de IA não respondeu" no Maestro):
 # 20s é generoso pra classificar UMA transação (`classify`, texto curto,
 # resposta de 1 palavra), mas curto demais pra uma resposta livre de Q&A
 # (`complete`/`stream`) quando o contexto injetado é grande (extrato
-# inteiro + série mensal) — timeout aqui vira exatamente o sintoma
-# reportado, sem nenhum erro real da Groq por trás. Deliberadamente
-# separado do timeout de classificação (que continua em 20s — não faz
-# sentido deixar uma transação travada por 45s numa classificação em
-# lote de centenas de itens).
-QA_TIMEOUT_SECONDS = 45.0
+# inteiro + série mensal) OU o pedido é aberto ("monte um relatório
+# organizado" -- resposta naturalmente mais longa que "quanto gastei").
+# Primeiro ajuste (17/09) foi pra 45s; usuário confirmou ao vivo que
+# ainda não bastava pra um relatório sobre "Todos os meses". Dobrado pra
+# 90s -- deliberadamente separado do timeout de classificação (que
+# continua em 20s: não faz sentido deixar uma transação travada por 90s
+# numa classificação em lote de centenas de itens). Combinado com o
+# retry de falha transitória (`_is_transient`, abaixo), o pior caso real
+# (2 tentativas de 90s) ainda cabe dentro de margem razoável antes do
+# usuário desistir sozinho.
+QA_TIMEOUT_SECONDS = 90.0
 
 
 class GroqProviderError(Exception):
