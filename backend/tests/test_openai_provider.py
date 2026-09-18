@@ -57,6 +57,60 @@ async def test_complete_raises_instead_of_swallowing_failures() -> None:
         await provider.complete(system="s", user="u")
 
 
+# ===== Retry em falha transitória (achado real, usuário, 2026-09-18: =====
+# ===== "provedor de IA não respondeu" reapareceu mesmo depois do timeout =====
+# ===== maior -- parte do sintoma é uma falha transitória de verdade). =====
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_complete_retries_once_and_succeeds_after_a_transient_500() -> None:
+    respx.post(OPENAI_CHAT_COMPLETIONS_URL).mock(
+        side_effect=[
+            httpx.Response(500, json={"error": "boom"}),
+            httpx.Response(200, json={"choices": [{"message": {"content": "Sua maior categoria foi Mercado."}}]}),
+        ]
+    )
+    provider = OpenAIProvider(api_key="test-key")
+    answer = await provider.complete(system="s", user="u")
+    assert answer == "Sua maior categoria foi Mercado."
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_complete_never_retries_a_definitive_401() -> None:
+    """Um único mock na fila -- se `complete()` tentasse de novo, o respx
+    ficaria sem resposta configurada pra devolver e o teste falharia com
+    um erro diferente de `OpenAIProviderError` (prova indireta de que só
+    UMA chamada real aconteceu)."""
+    respx.post(OPENAI_CHAT_COMPLETIONS_URL).mock(return_value=httpx.Response(401, json={"error": "bad key"}))
+    provider = OpenAIProvider(api_key="bad")
+    with pytest.raises(OpenAIProviderError):
+        await provider.complete(system="s", user="u")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_stream_retries_once_and_succeeds_when_nothing_was_emitted_yet() -> None:
+    sse_body = 'data: {"choices":[{"delta":{"content":"Olá"}}]}\n\ndata: [DONE]\n\n'
+    respx.post(OPENAI_CHAT_COMPLETIONS_URL).mock(
+        side_effect=[httpx.Response(500, json={"error": "boom"}), httpx.Response(200, content=sse_body)]
+    )
+    provider = OpenAIProvider(api_key="test-key")
+    deltas = [chunk async for chunk in provider.stream(system="s", user="u")]
+    assert deltas == ["Olá"]
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_stream_never_retries_a_definitive_401() -> None:
+    respx.post(OPENAI_CHAT_COMPLETIONS_URL).mock(return_value=httpx.Response(401, json={"error": "bad key"}))
+    provider = OpenAIProvider(api_key="bad")
+    with pytest.raises(OpenAIProviderError):
+        async for _ in provider.stream(system="s", user="u"):
+            pass
+
+
 @pytest.mark.asyncio
 @respx.mock
 async def test_test_connection_true_on_success_false_on_failure() -> None:

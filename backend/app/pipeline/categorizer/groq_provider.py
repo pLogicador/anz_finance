@@ -50,6 +50,22 @@ class GroqProviderError(Exception):
     """Raised by ``complete()``/``test_connection()`` on any failure -- never raised by ``classify()``."""
 
 
+def _is_transient(exc: Exception) -> bool:
+    """Achado real (usuário, 2026-09-18): "provedor de IA não respondeu"
+    reapareceu mesmo depois de já ter aumentado o timeout de Q&A pra
+    45s -- sinal de que nem sempre é questão de tempo, também pode ser um
+    problema transitório do LADO da Groq (uma queda de conexão, um 5xx,
+    um rate-limit momentâneo). Só esses casos valem retry -- um erro
+    definitivo (401 chave inválida, 400 corpo malformado) falharia
+    exatamente igual numa 2ª tentativa, então tentar de novo só atrasa a
+    resposta de erro sem chance real de sucesso."""
+    if isinstance(exc, (httpx.TimeoutException, httpx.TransportError)):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code >= 500 or exc.response.status_code == 429
+    return False
+
+
 class GroqProvider:
     provider_id = "groq"
 
@@ -91,11 +107,18 @@ class GroqProvider:
         return body["choices"][0]["message"]["content"]
 
     async def complete(self, *, system: str, user: str) -> str:
-        try:
-            async with httpx.AsyncClient(timeout=QA_TIMEOUT_SECONDS) as client:
-                return (await self._chat(client, user, system=system)).strip()
-        except Exception as exc:  # noqa: BLE001
-            raise GroqProviderError(str(exc)) from exc
+        last_exc: Exception | None = None
+        for attempt in range(2):  # 1 tentativa real + 1 retry só pra falha transitória
+            try:
+                async with httpx.AsyncClient(timeout=QA_TIMEOUT_SECONDS) as client:
+                    return (await self._chat(client, user, system=system)).strip()
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                if attempt == 0 and _is_transient(exc):
+                    await asyncio.sleep(0.6)
+                    continue
+                raise GroqProviderError(str(exc)) from exc
+        raise GroqProviderError(str(last_exc))  # inalcançável na prática, só satisfaz o type checker
 
     async def stream(self, *, system: str, user: str) -> AsyncIterator[str]:
         """Fase 4 do plano de streaming real -- mesmo endpoint/auth de
@@ -107,35 +130,52 @@ class GroqProvider:
         deltas) -- mesmo contrato de `complete()`, o chamador decide o que
         fazer com o texto parcial já recebido até ali."""
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-        try:
-            async with httpx.AsyncClient(timeout=QA_TIMEOUT_SECONDS) as client:
-                async with client.stream(
-                    "POST",
-                    GROQ_CHAT_COMPLETIONS_URL,
-                    headers={"Authorization": f"Bearer {self.api_key}"},
-                    json={"model": self.model, "messages": messages, "temperature": 0, "stream": True},
-                ) as response:
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if not line or not line.startswith("data:"):
-                            continue
-                        raw = line[len("data:") :].strip()
-                        if raw == "[DONE]":
-                            return
-                        try:
-                            chunk = json.loads(raw)
-                        except ValueError:
-                            continue
-                        choices = chunk.get("choices") or []
-                        delta = (choices[0].get("delta") or {}).get("content") if choices else None
-                        if delta:
-                            yield delta
-        except httpx.HTTPStatusError as exc:
-            raise GroqProviderError(f"Groq respondeu {exc.response.status_code}") from exc
-        except httpx.TimeoutException as exc:
-            raise GroqProviderError("Groq não respondeu a tempo") from exc
-        except httpx.TransportError as exc:
-            raise GroqProviderError(str(exc)) from exc
+        for attempt in range(2):  # 1 tentativa real + 1 retry, só se NENHUM delta já saiu nesta tentativa
+            emitted_any = False
+            try:
+                async with httpx.AsyncClient(timeout=QA_TIMEOUT_SECONDS) as client:
+                    async with client.stream(
+                        "POST",
+                        GROQ_CHAT_COMPLETIONS_URL,
+                        headers={"Authorization": f"Bearer {self.api_key}"},
+                        json={"model": self.model, "messages": messages, "temperature": 0, "stream": True},
+                    ) as response:
+                        response.raise_for_status()
+                        async for line in response.aiter_lines():
+                            if not line or not line.startswith("data:"):
+                                continue
+                            raw = line[len("data:") :].strip()
+                            if raw == "[DONE]":
+                                return
+                            try:
+                                chunk = json.loads(raw)
+                            except ValueError:
+                                continue
+                            choices = chunk.get("choices") or []
+                            delta = (choices[0].get("delta") or {}).get("content") if choices else None
+                            if delta:
+                                emitted_any = True
+                                yield delta
+                return
+            except httpx.HTTPStatusError as exc:
+                # Retry só faz sentido antes de qualquer delta já ter saído --
+                # depois disso, tentar de novo duplicaria/corromperia o texto
+                # parcial que quem chamou já recebeu (mesmo racional do
+                # 'partial' terminal em syncron_core).
+                if not emitted_any and attempt == 0 and _is_transient(exc):
+                    await asyncio.sleep(0.6)
+                    continue
+                raise GroqProviderError(f"Groq respondeu {exc.response.status_code}") from exc
+            except httpx.TimeoutException as exc:
+                if not emitted_any and attempt == 0:
+                    await asyncio.sleep(0.6)
+                    continue
+                raise GroqProviderError("Groq não respondeu a tempo") from exc
+            except httpx.TransportError as exc:
+                if not emitted_any and attempt == 0:
+                    await asyncio.sleep(0.6)
+                    continue
+                raise GroqProviderError(str(exc)) from exc
 
     async def test_connection(self) -> bool:
         try:

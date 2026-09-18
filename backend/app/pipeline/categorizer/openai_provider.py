@@ -29,6 +29,17 @@ class OpenAIProviderError(Exception):
     pass
 
 
+def _is_transient(exc: Exception) -> bool:
+    """Ver o mesmo comentário em groq_provider.py -- só falha transitória
+    (timeout/conexão/5xx/429) vale retry; um erro definitivo (401/400)
+    falharia exatamente igual numa 2ª tentativa."""
+    if isinstance(exc, (httpx.TimeoutException, httpx.TransportError)):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code >= 500 or exc.response.status_code == 429
+    return False
+
+
 class OpenAIProvider:
     provider_id = "openai"
 
@@ -70,46 +81,66 @@ class OpenAIProvider:
         return body["choices"][0]["message"]["content"]
 
     async def complete(self, *, system: str, user: str) -> str:
-        try:
-            async with httpx.AsyncClient(timeout=QA_TIMEOUT_SECONDS) as client:
-                return (await self._chat(client, user, system=system)).strip()
-        except Exception as exc:  # noqa: BLE001
-            raise OpenAIProviderError(str(exc)) from exc
+        last_exc: Exception | None = None
+        for attempt in range(2):
+            try:
+                async with httpx.AsyncClient(timeout=QA_TIMEOUT_SECONDS) as client:
+                    return (await self._chat(client, user, system=system)).strip()
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                if attempt == 0 and _is_transient(exc):
+                    await asyncio.sleep(0.6)
+                    continue
+                raise OpenAIProviderError(str(exc)) from exc
+        raise OpenAIProviderError(str(last_exc))
 
     async def stream(self, *, system: str, user: str) -> AsyncIterator[str]:
         """Fase 4 do plano de streaming real -- mesmo racional/contrato do
         GroqProvider.stream (as duas APIs são compatíveis no formato de
         Chat Completions, incluindo o shape do SSE)."""
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-        try:
-            async with httpx.AsyncClient(timeout=QA_TIMEOUT_SECONDS) as client:
-                async with client.stream(
-                    "POST",
-                    OPENAI_CHAT_COMPLETIONS_URL,
-                    headers={"Authorization": f"Bearer {self.api_key}"},
-                    json={"model": self.model, "messages": messages, "temperature": 0, "stream": True},
-                ) as response:
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if not line or not line.startswith("data:"):
-                            continue
-                        raw = line[len("data:") :].strip()
-                        if raw == "[DONE]":
-                            return
-                        try:
-                            chunk = json.loads(raw)
-                        except ValueError:
-                            continue
-                        choices = chunk.get("choices") or []
-                        delta = (choices[0].get("delta") or {}).get("content") if choices else None
-                        if delta:
-                            yield delta
-        except httpx.HTTPStatusError as exc:
-            raise OpenAIProviderError(f"OpenAI respondeu {exc.response.status_code}") from exc
-        except httpx.TimeoutException as exc:
-            raise OpenAIProviderError("OpenAI não respondeu a tempo") from exc
-        except httpx.TransportError as exc:
-            raise OpenAIProviderError(str(exc)) from exc
+        for attempt in range(2):
+            emitted_any = False
+            try:
+                async with httpx.AsyncClient(timeout=QA_TIMEOUT_SECONDS) as client:
+                    async with client.stream(
+                        "POST",
+                        OPENAI_CHAT_COMPLETIONS_URL,
+                        headers={"Authorization": f"Bearer {self.api_key}"},
+                        json={"model": self.model, "messages": messages, "temperature": 0, "stream": True},
+                    ) as response:
+                        response.raise_for_status()
+                        async for line in response.aiter_lines():
+                            if not line or not line.startswith("data:"):
+                                continue
+                            raw = line[len("data:") :].strip()
+                            if raw == "[DONE]":
+                                return
+                            try:
+                                chunk = json.loads(raw)
+                            except ValueError:
+                                continue
+                            choices = chunk.get("choices") or []
+                            delta = (choices[0].get("delta") or {}).get("content") if choices else None
+                            if delta:
+                                emitted_any = True
+                                yield delta
+                return
+            except httpx.HTTPStatusError as exc:
+                if not emitted_any and attempt == 0 and _is_transient(exc):
+                    await asyncio.sleep(0.6)
+                    continue
+                raise OpenAIProviderError(f"OpenAI respondeu {exc.response.status_code}") from exc
+            except httpx.TimeoutException as exc:
+                if not emitted_any and attempt == 0:
+                    await asyncio.sleep(0.6)
+                    continue
+                raise OpenAIProviderError("OpenAI não respondeu a tempo") from exc
+            except httpx.TransportError as exc:
+                if not emitted_any and attempt == 0:
+                    await asyncio.sleep(0.6)
+                    continue
+                raise OpenAIProviderError(str(exc)) from exc
 
     async def test_connection(self) -> bool:
         try:

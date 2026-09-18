@@ -7,6 +7,7 @@ one request and never logged, stored, or echoed back.
 from __future__ import annotations
 
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -23,6 +24,7 @@ from app.workspace.deps import get_workspace_payload
 from app.workspace.models import WorkspacePayload
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+logger = logging.getLogger("anz.ai")
 
 
 def _build_provider_or_400(provider_id: str, model: str | None, api_key: str | None, settings: Settings):
@@ -136,6 +138,11 @@ async def ask(
     try:
         answer = await provider.complete(system=GROUNDING_SYSTEM_PROMPT, user=user_prompt)
     except Exception as exc:  # noqa: BLE001 -- provider-specific exceptions, never surfaced raw
+        # Achado real (usuário, 2026-09-18): a mensagem genérica pro usuário
+        # não diferencia timeout/rate-limit/erro real da Groq -- sem
+        # logar a causa de verdade aqui, cada nova ocorrência fica
+        # impossível de diagnosticar depois (só via Railway logs).
+        logger.error("Provedor de IA falhou em /ai/ask (provider=%s): %s", body.provider, exc)
         raise HTTPException(status_code=502, detail={"message": "O provedor de IA não respondeu. Tente novamente em instantes."}) from exc
 
     return {"answer": answer}
@@ -167,7 +174,8 @@ async def ask_stream(
         try:
             async for delta in provider.stream(system=GROUNDING_SYSTEM_PROMPT, user=user_prompt):
                 yield f"event: delta\ndata: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"
-        except Exception:  # noqa: BLE001 -- provider-specific exceptions, never surfaced raw
+        except Exception as exc:  # noqa: BLE001 -- provider-specific exceptions, never surfaced raw
+            logger.error("Provedor de IA falhou em /ai/ask/stream (provider=%s): %s", body.provider, exc)
             error_payload = json.dumps(
                 {"message": "O provedor de IA não respondeu. Tente novamente em instantes."}, ensure_ascii=False
             )
