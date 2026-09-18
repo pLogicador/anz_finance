@@ -55,20 +55,43 @@ class GroqProviderError(Exception):
     """Raised by ``complete()``/``test_connection()`` on any failure -- never raised by ``classify()``."""
 
 
-def _is_transient(exc: Exception) -> bool:
-    """Achado real (usuário, 2026-09-18): "provedor de IA não respondeu"
-    reapareceu mesmo depois de já ter aumentado o timeout de Q&A pra
-    45s -- sinal de que nem sempre é questão de tempo, também pode ser um
-    problema transitório do LADO da Groq (uma queda de conexão, um 5xx,
-    um rate-limit momentâneo). Só esses casos valem retry -- um erro
-    definitivo (401 chave inválida, 400 corpo malformado) falharia
-    exatamente igual numa 2ª tentativa, então tentar de novo só atrasa a
-    resposta de erro sem chance real de sucesso."""
+_DEFAULT_RETRY_DELAY_SECONDS = 0.6
+# Achado real (usuário, 2026-09-18, medido via busca real dos limites
+# vigentes da Groq): o tier gratuito do llama-3.1-8b-instant é restrito a
+# só 30 requisições/minuto E 6.000 tokens/minuto -- o prompt de
+# classificação (labels.py, ~400 palavras, reenviado por inteiro a CADA
+# transação que a camada de regras não resolveu sozinha, ver rules.py) já
+# aproxima ou ultrapassa esse orçamento de tokens num extrato com dúzias
+# de transações. A pergunta de Q&A seguinte herda a MESMA janela de 1
+# minuto, então cai em 429 mesmo sem nenhum problema real -- e 0.6s fixo
+# (o valor original, ainda correto pra timeout/conexão/5xx) nunca dá
+# tempo real de uma janela por MINUTO liberar.
+_RATE_LIMIT_DEFAULT_DELAY_SECONDS = 5.0
+_RATE_LIMIT_MAX_DELAY_SECONDS = 20.0
+
+
+def _retry_delay_seconds(exc: Exception) -> float | None:
+    """Quanto esperar antes de tentar de novo, ou `None` se o erro não vale
+    retry nenhum (um 401/400 definitivo falharia idêntico numa 2ª
+    tentativa -- tentar de novo só atrasa a resposta de erro à toa). Pra
+    429 especificamente, respeita o cabeçalho `Retry-After` da própria
+    Groq quando presente (padrão HTTP, capado pra não esperar um tempo
+    absurdo), com um piso mais realista quando ausente."""
     if isinstance(exc, (httpx.TimeoutException, httpx.TransportError)):
-        return True
+        return _DEFAULT_RETRY_DELAY_SECONDS
     if isinstance(exc, httpx.HTTPStatusError):
-        return exc.response.status_code >= 500 or exc.response.status_code == 429
-    return False
+        status = exc.response.status_code
+        if status == 429:
+            retry_after = exc.response.headers.get("retry-after")
+            if retry_after:
+                try:
+                    return min(float(retry_after), _RATE_LIMIT_MAX_DELAY_SECONDS)
+                except ValueError:
+                    pass
+            return _RATE_LIMIT_DEFAULT_DELAY_SECONDS
+        if status >= 500:
+            return _DEFAULT_RETRY_DELAY_SECONDS
+    return None
 
 
 class GroqProvider:
@@ -119,8 +142,9 @@ class GroqProvider:
                     return (await self._chat(client, user, system=system)).strip()
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
-                if attempt == 0 and _is_transient(exc):
-                    await asyncio.sleep(0.6)
+                delay = _retry_delay_seconds(exc)
+                if attempt == 0 and delay is not None:
+                    await asyncio.sleep(delay)
                     continue
                 raise GroqProviderError(str(exc)) from exc
         raise GroqProviderError(str(last_exc))  # inalcançável na prática, só satisfaz o type checker
@@ -167,18 +191,19 @@ class GroqProvider:
                 # depois disso, tentar de novo duplicaria/corromperia o texto
                 # parcial que quem chamou já recebeu (mesmo racional do
                 # 'partial' terminal em syncron_core).
-                if not emitted_any and attempt == 0 and _is_transient(exc):
-                    await asyncio.sleep(0.6)
+                delay = _retry_delay_seconds(exc)
+                if not emitted_any and attempt == 0 and delay is not None:
+                    await asyncio.sleep(delay)
                     continue
                 raise GroqProviderError(f"Groq respondeu {exc.response.status_code}") from exc
             except httpx.TimeoutException as exc:
                 if not emitted_any and attempt == 0:
-                    await asyncio.sleep(0.6)
+                    await asyncio.sleep(_DEFAULT_RETRY_DELAY_SECONDS)
                     continue
                 raise GroqProviderError("Groq não respondeu a tempo") from exc
             except httpx.TransportError as exc:
                 if not emitted_any and attempt == 0:
-                    await asyncio.sleep(0.6)
+                    await asyncio.sleep(_DEFAULT_RETRY_DELAY_SECONDS)
                     continue
                 raise GroqProviderError(str(exc)) from exc
 

@@ -31,15 +31,31 @@ class OpenAIProviderError(Exception):
     pass
 
 
-def _is_transient(exc: Exception) -> bool:
+_DEFAULT_RETRY_DELAY_SECONDS = 0.6
+_RATE_LIMIT_DEFAULT_DELAY_SECONDS = 5.0
+_RATE_LIMIT_MAX_DELAY_SECONDS = 20.0
+
+
+def _retry_delay_seconds(exc: Exception) -> float | None:
     """Ver o mesmo comentário em groq_provider.py -- só falha transitória
-    (timeout/conexão/5xx/429) vale retry; um erro definitivo (401/400)
-    falharia exatamente igual numa 2ª tentativa."""
+    vale retry (um 401/400 definitivo falharia idêntico numa 2ª
+    tentativa); 429 respeita `Retry-After` quando presente, já que uma
+    janela de rate-limit por MINUTO nunca libera em menos de 1 segundo."""
     if isinstance(exc, (httpx.TimeoutException, httpx.TransportError)):
-        return True
+        return _DEFAULT_RETRY_DELAY_SECONDS
     if isinstance(exc, httpx.HTTPStatusError):
-        return exc.response.status_code >= 500 or exc.response.status_code == 429
-    return False
+        status = exc.response.status_code
+        if status == 429:
+            retry_after = exc.response.headers.get("retry-after")
+            if retry_after:
+                try:
+                    return min(float(retry_after), _RATE_LIMIT_MAX_DELAY_SECONDS)
+                except ValueError:
+                    pass
+            return _RATE_LIMIT_DEFAULT_DELAY_SECONDS
+        if status >= 500:
+            return _DEFAULT_RETRY_DELAY_SECONDS
+    return None
 
 
 class OpenAIProvider:
@@ -90,8 +106,9 @@ class OpenAIProvider:
                     return (await self._chat(client, user, system=system)).strip()
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
-                if attempt == 0 and _is_transient(exc):
-                    await asyncio.sleep(0.6)
+                delay = _retry_delay_seconds(exc)
+                if attempt == 0 and delay is not None:
+                    await asyncio.sleep(delay)
                     continue
                 raise OpenAIProviderError(str(exc)) from exc
         raise OpenAIProviderError(str(last_exc))
@@ -129,18 +146,19 @@ class OpenAIProvider:
                                 yield delta
                 return
             except httpx.HTTPStatusError as exc:
-                if not emitted_any and attempt == 0 and _is_transient(exc):
-                    await asyncio.sleep(0.6)
+                delay = _retry_delay_seconds(exc)
+                if not emitted_any and attempt == 0 and delay is not None:
+                    await asyncio.sleep(delay)
                     continue
                 raise OpenAIProviderError(f"OpenAI respondeu {exc.response.status_code}") from exc
             except httpx.TimeoutException as exc:
                 if not emitted_any and attempt == 0:
-                    await asyncio.sleep(0.6)
+                    await asyncio.sleep(_DEFAULT_RETRY_DELAY_SECONDS)
                     continue
                 raise OpenAIProviderError("OpenAI não respondeu a tempo") from exc
             except httpx.TransportError as exc:
                 if not emitted_any and attempt == 0:
-                    await asyncio.sleep(0.6)
+                    await asyncio.sleep(_DEFAULT_RETRY_DELAY_SECONDS)
                     continue
                 raise OpenAIProviderError(str(exc)) from exc
 

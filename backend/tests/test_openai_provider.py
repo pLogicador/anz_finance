@@ -8,7 +8,12 @@ import httpx
 import pytest
 import respx
 
-from app.pipeline.categorizer.openai_provider import OPENAI_CHAT_COMPLETIONS_URL, OpenAIProvider, OpenAIProviderError
+from app.pipeline.categorizer.openai_provider import (
+    OPENAI_CHAT_COMPLETIONS_URL,
+    OpenAIProvider,
+    OpenAIProviderError,
+    _retry_delay_seconds,
+)
 
 
 @pytest.mark.asyncio
@@ -109,6 +114,36 @@ async def test_stream_never_retries_a_definitive_401() -> None:
     with pytest.raises(OpenAIProviderError):
         async for _ in provider.stream(system="s", user="u"):
             pass
+
+
+# ===== _retry_delay_seconds: decisão pura, sem rede/sleep real =====
+
+
+def _http_error(status: int, headers: dict | None = None) -> httpx.HTTPStatusError:
+    request = httpx.Request("POST", OPENAI_CHAT_COMPLETIONS_URL)
+    response = httpx.Response(status, headers=headers or {}, request=request)
+    return httpx.HTTPStatusError("boom", request=request, response=response)
+
+
+def test_retry_delay_honors_a_real_retry_after_header() -> None:
+    assert _retry_delay_seconds(_http_error(429, {"retry-after": "3"})) == 3.0
+
+
+def test_retry_delay_caps_an_absurdly_long_retry_after() -> None:
+    assert _retry_delay_seconds(_http_error(429, {"retry-after": "9999"})) == 20.0
+
+
+def test_retry_delay_falls_back_to_a_realistic_default_without_the_header() -> None:
+    assert _retry_delay_seconds(_http_error(429)) == 5.0
+
+
+def test_retry_delay_for_a_5xx_stays_the_short_transient_default() -> None:
+    assert _retry_delay_seconds(_http_error(503)) == 0.6
+
+
+def test_retry_delay_is_none_for_a_definitive_client_error() -> None:
+    assert _retry_delay_seconds(_http_error(401)) is None
+    assert _retry_delay_seconds(_http_error(400)) is None
 
 
 @pytest.mark.asyncio
