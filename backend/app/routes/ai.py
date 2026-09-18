@@ -17,7 +17,7 @@ from app.core.config import Settings, get_settings
 from app.pipeline import metrics
 from app.pipeline.categorizer.registry import AVAILABLE_MODELS, MissingApiKey, UnknownProvider, build_provider, require_api_key
 from app.pipeline.categorizer.schemas import AiAskRequest, AiTestConnectionRequest
-from app.pipeline.filters import apply_type_filter, filter_transactions, filter_transactions_for_trend
+from app.pipeline.filters import ALL_MONTHS, apply_type_filter, filter_transactions, filter_transactions_for_trend
 from app.pipeline.insights import build_insights
 from app.workspace.deps import get_workspace_payload
 from app.workspace.models import WorkspacePayload
@@ -80,8 +80,9 @@ def _build_grounding_context(*, summary: metrics.PeriodSummary, deltas: dict[str
         f"- {row['Mês']}: receitas R$ {row['Receitas']:.2f}, despesas R$ {abs(row['Despesas']):.2f}, saldo R$ {row['Saldo']:.2f}"
         for _, row in monthly.iterrows()
     ) or "nenhum"
+    month_label = "todos os meses disponíveis (visão agregada, sem filtro de mês)" if month == ALL_MONTHS else month
     return (
-        f"Mês selecionado: {month}\n"
+        f"Mês selecionado: {month_label}\n"
         f"Receitas do período: R$ {summary.income:.2f}\n"
         f"Despesas do período: R$ {abs(summary.expense):.2f}\n"
         f"Saldo do período: R$ {summary.net:.2f}\n"

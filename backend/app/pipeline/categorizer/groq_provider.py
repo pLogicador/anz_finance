@@ -34,6 +34,16 @@ DEFAULT_MODEL = "llama-3.1-8b-instant"
 GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
 DEFAULT_CONCURRENCY = 8
 DEFAULT_TIMEOUT_SECONDS = 20.0
+# Achado real (2026-09-17, "provedor de IA não respondeu" no Maestro):
+# 20s é generoso pra classificar UMA transação (`classify`, texto curto,
+# resposta de 1 palavra), mas curto demais pra uma resposta livre de Q&A
+# (`complete`/`stream`) quando o contexto injetado é grande (extrato
+# inteiro + série mensal) — timeout aqui vira exatamente o sintoma
+# reportado, sem nenhum erro real da Groq por trás. Deliberadamente
+# separado do timeout de classificação (que continua em 20s — não faz
+# sentido deixar uma transação travada por 45s numa classificação em
+# lote de centenas de itens).
+QA_TIMEOUT_SECONDS = 45.0
 
 
 class GroqProviderError(Exception):
@@ -82,7 +92,7 @@ class GroqProvider:
 
     async def complete(self, *, system: str, user: str) -> str:
         try:
-            async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+            async with httpx.AsyncClient(timeout=QA_TIMEOUT_SECONDS) as client:
                 return (await self._chat(client, user, system=system)).strip()
         except Exception as exc:  # noqa: BLE001
             raise GroqProviderError(str(exc)) from exc
@@ -98,7 +108,7 @@ class GroqProvider:
         fazer com o texto parcial já recebido até ali."""
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         try:
-            async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+            async with httpx.AsyncClient(timeout=QA_TIMEOUT_SECONDS) as client:
                 async with client.stream(
                     "POST",
                     GROQ_CHAT_COMPLETIONS_URL,

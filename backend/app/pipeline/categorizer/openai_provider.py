@@ -20,6 +20,9 @@ DEFAULT_MODEL = "gpt-4o-mini"
 OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions"
 DEFAULT_CONCURRENCY = 8
 DEFAULT_TIMEOUT_SECONDS = 20.0
+# Ver o mesmo comentário em groq_provider.py -- Q&A livre (complete/stream)
+# precisa de mais fôlego que classificar uma única transação.
+QA_TIMEOUT_SECONDS = 45.0
 
 
 class OpenAIProviderError(Exception):
@@ -68,7 +71,7 @@ class OpenAIProvider:
 
     async def complete(self, *, system: str, user: str) -> str:
         try:
-            async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+            async with httpx.AsyncClient(timeout=QA_TIMEOUT_SECONDS) as client:
                 return (await self._chat(client, user, system=system)).strip()
         except Exception as exc:  # noqa: BLE001
             raise OpenAIProviderError(str(exc)) from exc
@@ -79,7 +82,7 @@ class OpenAIProvider:
         Chat Completions, incluindo o shape do SSE)."""
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         try:
-            async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+            async with httpx.AsyncClient(timeout=QA_TIMEOUT_SECONDS) as client:
                 async with client.stream(
                     "POST",
                     OPENAI_CHAT_COMPLETIONS_URL,

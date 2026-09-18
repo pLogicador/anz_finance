@@ -22,9 +22,19 @@ from __future__ import annotations
 
 import pandas as pd
 
+# Sentinel pro "todos os meses" (2026-09-17, Maestro/Hub — usuário não
+# precisa mais escolher exatamente um mês pra perguntar sobre as finanças).
+# Nunca colide com um mês real: "Mês" sempre é "AAAA-MM" (ver
+# preprocess_df), este valor não bate com esse formato. Aditivo por
+# desenho — todo mês real continua filtrando exatamente como sempre
+# filtrou (regra "empty categories list = no filter" preservada verbatim,
+# ver app/CLAUDE.md), esta é só uma segunda entrada nova pro parâmetro
+# `month`, não uma mudança de comportamento do que já existia.
+ALL_MONTHS = "__all__"
+
 
 def filter_transactions(df: pd.DataFrame, month: str, categories: list[str] | None) -> pd.DataFrame:
-    filtered = df[df["Mês"] == month]
+    filtered = df if month == ALL_MONTHS else df[df["Mês"] == month]
     if categories:
         filtered = filtered[filtered["Categorias"].isin(categories)]
     return filtered

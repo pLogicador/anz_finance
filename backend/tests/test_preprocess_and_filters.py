@@ -5,7 +5,7 @@ import datetime as dt
 import pandas as pd
 import pytest
 
-from app.pipeline.filters import apply_type_filter, filter_transactions, filter_transactions_for_trend
+from app.pipeline.filters import ALL_MONTHS, apply_type_filter, filter_transactions, filter_transactions_for_trend
 from app.pipeline.preprocess import preprocess_df
 
 
@@ -71,6 +71,26 @@ def test_filter_transactions_none_categories_also_means_no_filter() -> None:
 def test_filter_transactions_always_applies_the_month_filter() -> None:
     df = _classified_df()
     result = filter_transactions(df, "2026-02", None)
+    assert result["Descrição"].tolist() == ["Luz"]
+
+
+def test_filter_transactions_all_months_sentinel_skips_the_month_filter() -> None:
+    """2026-09-17, Maestro/Hub: "Todos os meses" -- o sentinel devolve o
+    histórico inteiro (ainda respeitando categorias), sem afetar nenhum mês
+    real (regra "month filter always applies" preservada verbatim pra
+    qualquer valor que não seja o sentinel -- ver os testes acima)."""
+    df = _classified_df()
+
+    result = filter_transactions(df, ALL_MONTHS, None)
+
+    assert sorted(result["Descrição"].tolist()) == ["Luz", "Mercado", "Salário"]
+
+
+def test_filter_transactions_all_months_sentinel_still_applies_category_filter() -> None:
+    df = _classified_df()
+
+    result = filter_transactions(df, ALL_MONTHS, ["Moradia"])
+
     assert result["Descrição"].tolist() == ["Luz"]
 
 
